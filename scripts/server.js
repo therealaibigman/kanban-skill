@@ -490,6 +490,49 @@ app.post('/api/import/json', upload.single('file'), async (req, res) => {
     }
 });
 
+// Comments endpoints
+app.post('/api/cards/:id/comments', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const { text, author } = req.body;
+        
+        if (!text) {
+            return res.status(400).json({ error: 'Comment text required' });
+        }
+        
+        const comment = board.addComment(cardId, text, author || 'The Big Man');
+        res.status(201).json(comment);
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.get('/api/cards/:id/comments', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const comments = board.getComments(cardId);
+        res.json(comments);
+    } catch (error) {
+        console.error('Error fetching comments:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.delete('/api/cards/:id/comments/:commentId', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const { id: cardId, commentId } = req.params;
+        const deletedComment = board.deleteComment(cardId, commentId);
+        res.json(deletedComment);
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });

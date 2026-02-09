@@ -141,7 +141,8 @@ class KanbanBoard {
             column: targetColumn,
             schedule: options.schedule || 'once', // once, heartbeat, cron
             cronExpression: options.cronExpression || null,
-            cronJobId: options.cronJobId || null
+            cronJobId: options.cronJobId || null,
+            comments: options.comments || []
         };
 
         // Add to specified column
@@ -452,6 +453,82 @@ class KanbanBoard {
         
         console.log(`[Reorder] Moved ${card.title} from position ${oldIndex} to ${newPosition} in ${column}`);
         return this.columns;
+    }
+
+    addComment(cardId, commentText, author = 'The Big Man') {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+        
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        if (!card.comments) {
+            card.comments = [];
+        }
+
+        const comment = {
+            id: uuidv4(),
+            text: commentText,
+            author: author,
+            createdAt: new Date().toISOString()
+        };
+
+        card.comments.push(comment);
+        card.updatedAt = new Date().toISOString();
+        this.saveBoard();
+
+        console.log(`[Comment] Added to ${card.title}: ${commentText.substring(0, 50)}...`);
+        return comment;
+    }
+
+    getComments(cardId) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+        
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        return card.comments || [];
+    }
+
+    deleteComment(cardId, commentId) {
+        // Find card
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+        
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        if (!card.comments) {
+            throw new Error('No comments on this card');
+        }
+
+        const commentIndex = card.comments.findIndex(c => c.id === commentId);
+        
+        if (commentIndex === -1) {
+            throw new Error(`Comment ${commentId} not found`);
+        }
+
+        const [deletedComment] = card.comments.splice(commentIndex, 1);
+        card.updatedAt = new Date().toISOString();
+        this.saveBoard();
+
+        console.log(`[Comment] Deleted from ${card.title}`);
+        return deletedComment;
     }
 }
 

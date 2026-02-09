@@ -446,6 +446,9 @@ function openEditModal(card) {
 
     modalTitle.textContent = 'Edit Task';
     
+    // Load comments
+    loadComments(card.id);
+    
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -553,6 +556,9 @@ document.getElementById('addCardBtn').addEventListener('click', () => {
     
     // Hide cron field by default
     document.getElementById('cronExpressionDiv').classList.add('hidden');
+    
+    // Clear comments for new task
+    document.getElementById('commentsContainer').innerHTML = '<p class="text-white/50 text-sm italic">No comments yet</p>';
     
     const modal = document.getElementById('cardModal');
     modal.classList.remove('hidden');
@@ -924,3 +930,103 @@ document.getElementById('closeImportBtn').addEventListener('click', closeImportM
 document.getElementById('exportJsonBtn').addEventListener('click', exportJSON);
 document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
 document.getElementById('importJsonBtn').addEventListener('click', importJSON);
+
+// === COMMENTS ===
+
+async function loadComments(cardId) {
+    try {
+        const response = await fetch(`/api/cards/${cardId}/comments`, {
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load comments');
+        }
+        
+        const comments = await response.json();
+        renderComments(comments);
+    } catch (error) {
+        console.error('Error loading comments:', error);
+    }
+}
+
+function renderComments(comments) {
+    const container = document.getElementById('commentsContainer');
+    
+    if (!comments || comments.length === 0) {
+        container.innerHTML = '<p class="text-white/50 text-sm italic">No comments yet</p>';
+        return;
+    }
+    
+    container.innerHTML = comments.map(comment => {
+        const date = new Date(comment.createdAt).toLocaleString();
+        return `
+            <div class="bg-white/10 rounded-lg p-3 border border-white/20">
+                <div class="flex justify-between items-start mb-1">
+                    <span class="text-white/90 font-semibold text-sm">${comment.author || 'Unknown'}</span>
+                    <button class="text-white/60 hover:text-red-400 text-xs" onclick="deleteComment('${comment.id}')">🗑️</button>
+                </div>
+                <p class="text-white/80 text-sm mb-1">${comment.text}</p>
+                <span class="text-white/50 text-xs">${date}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+async function addComment() {
+    const cardId = document.getElementById('cardIdInput').value;
+    const commentInput = document.getElementById('newCommentInput');
+    const text = commentInput.value.trim();
+    
+    if (!text) return;
+    
+    try {
+        const response = await fetch(`/api/cards/${cardId}/comments`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ text, author: 'The Big Man' })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to add comment');
+        }
+        
+        commentInput.value = '';
+        await loadComments(cardId);
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        alert('Failed to add comment');
+    }
+}
+
+async function deleteComment(commentId) {
+    const cardId = document.getElementById('cardIdInput').value;
+    
+    if (!confirm('Delete this comment?')) return;
+    
+    try {
+        const response = await fetch(`/api/cards/${cardId}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete comment');
+        }
+        
+        await loadComments(cardId);
+    } catch (error) {
+        console.error('Error deleting comment:', error);
+        alert('Failed to delete comment');
+    }
+}
+
+// Comment button handler
+document.getElementById('addCommentBtn').addEventListener('click', addComment);
+
+// Allow Enter key to add comment
+document.getElementById('newCommentInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        addComment();
+    }
+});
