@@ -11,12 +11,14 @@ An OpenClaw skill that provides a visual kanban board with HEARTBEAT.md integrat
 
 ## Features
 
-- 🎯 **Visual Kanban Board** - Web UI with drag-and-drop
+- 🎯 **Modern Dashboard UI** - Beautiful glassmorphism design with gradient themes
+- 🔐 **Password Login** - Easy authentication with password → token exchange
+- 🎨 **Visual Kanban Board** - Drag-and-drop with smooth animations
+- 📊 **Live Stats** - Real-time task counts for each column
 - 🔄 **HEARTBEAT.md Sync** - Bi-directional sync with your heartbeat checklist
 - ⚡ **Auto-Execution** - Tasks moved to "In Progress" trigger instant execution by OpenClaw
-- 🔒 **Secure Authentication** - Uses OpenClaw gateway token for access control
+- 🔒 **Secure Authentication** - Token-based auth with password option
 - 💬 **Conversational Interface** - Manage tasks through natural language
-- 📊 **Four Columns** - Backlog, To Do, In Progress, Done
 - 🏷️ **Rich Tasks** - Title, description, priority, tags, due dates
 - 🚀 **REST API** - Full programmatic control
 - 🔧 **Systemd Service** - Production-ready deployment
@@ -44,7 +46,24 @@ sudo systemctl start kanban.service
 sudo systemctl enable kanban.service  # Auto-start on boot
 ```
 
-### 3. Access the Web UI
+### 3. Configure Password (Optional but Recommended)
+
+Add a password to your OpenClaw config for easy login:
+
+```bash
+# Edit config
+nano ~/.openclaw/openclaw.json
+
+# Add under gateway.auth:
+"password": "your-secure-password"
+```
+
+Or set via environment variable:
+```bash
+export KANBAN_PASSWORD="your-secure-password"
+```
+
+### 4. Access the Web UI
 
 **Local:**
 - http://127.0.0.1:18790/kanban
@@ -52,10 +71,15 @@ sudo systemctl enable kanban.service  # Auto-start on boot
 **Via NGINX (recommended):**
 - https://able-harp.exe.xyz/kanban
 
+**Login Options:**
+1. **Password Login** (easiest) - Enter the password from your config
+2. **Token Login** - The password login returns your token automatically
+
 **On first visit:**
-- You'll be prompted to enter your OpenClaw gateway token
-- The token is securely stored in browser localStorage
-- Use the "Logout" button to clear it
+- Modern login screen with password prompt
+- Password authentication returns your token
+- Token stored securely in browser localStorage
+- Use the "🔓 Logout" button to clear it
 
 ### 4. Load Tasks from HEARTBEAT.md
 
@@ -255,6 +279,7 @@ curl http://127.0.0.1:18790/api/executions/queue \
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/health` | No | Health check |
+| POST | `/api/auth/login` | No | Password login (returns token) |
 | GET | `/api/cards` | Yes | List all cards |
 | POST | `/api/cards` | Yes | Create card |
 | PUT | `/api/cards/:id` | Yes | Update card |
