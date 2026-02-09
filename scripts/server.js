@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 
 const KanbanBoard = require('./models/board');
+const TaskExecutor = require('./task-executor');
 
 const app = express();
 const PORT = process.env.KANBAN_PORT || 18790;
@@ -83,12 +84,24 @@ app.delete('/api/cards/:id', (req, res) => {
     }
 });
 
-app.put('/api/cards/:id/move', (req, res) => {
+app.put('/api/cards/:id/move', async (req, res) => {
     try {
         const board = KanbanBoard.getInstance();
         const cardId = req.params.id;
         const { fromColumn, toColumn } = req.body;
         const movedCard = board.moveCard(cardId, fromColumn, toColumn);
+        
+        // Auto-execute if moved to "in-progress"
+        if (toColumn === 'in-progress') {
+            console.log(`[Auto-Execute] Task moved to in-progress: ${movedCard.title}`);
+            const executor = new TaskExecutor();
+            
+            // Execute async, don't wait for response
+            executor.executeTask(movedCard).catch(err => {
+                console.error('[Auto-Execute] Error:', err);
+            });
+        }
+        
         res.json(movedCard);
     } catch (error) {
         console.error(`Error moving card ${req.params.id}:`, error);
@@ -153,6 +166,54 @@ app.post('/api/heartbeat/sync', (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });
+});
+
+// Get execution log
+app.get('/api/executions/log', async (req, res) => {
+    try {
+        const executor = new TaskExecutor();
+        const log = await executor.getExecutionLog();
+        res.type('text/plain').send(log);
+    } catch (error) {
+        console.error('Error fetching execution log:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get pending task queue
+app.get('/api/executions/queue', async (req, res) => {
+    try {
+        const fs = require('fs-extra');
+        const path = require('path');
+        const queueFile = path.join(process.env.HOME, '.openclaw', 'workspace', 'kanban-task-queue.json');
+        
+        if (await fs.pathExists(queueFile)) {
+            const queue = await fs.readJson(queueFile);
+            res.json(queue);
+        } else {
+            res.json([]);
+        }
+    } catch (error) {
+        console.error('Error fetching task queue:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Clear task queue (after processing)
+app.delete('/api/executions/queue', async (req, res) => {
+    try {
+        const fs = require('fs-extra');
+        const path = require('path');
+        const queueFile = path.join(process.env.HOME, '.openclaw', 'workspace', 'kanban-task-queue.json');
+        
+        if (await fs.pathExists(queueFile)) {
+            await fs.remove(queueFile);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error clearing task queue:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Serve index.html at /kanban

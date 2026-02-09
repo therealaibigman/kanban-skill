@@ -13,6 +13,7 @@ A visual kanban board for managing tasks with automatic HEARTBEAT.md synchroniza
 - **API**: REST API for programmatic task management
 - **HEARTBEAT Sync**: Bi-directional sync with HEARTBEAT.md checklist
 - **Conversational Interface**: Manage tasks through natural language
+- **Auto-Execution**: Tasks moved to "In Progress" trigger automatic execution by The Big Man
 
 ## Starting the Server
 
@@ -228,6 +229,69 @@ Each task has:
 - `createdAt`: ISO timestamp
 - `updatedAt`: ISO timestamp
 - `dueDate`: Optional due date
+
+## Auto-Execution Feature
+
+### How It Works
+
+When a task is moved to the "In Progress" column (via UI or API), the kanban server automatically:
+
+1. Detects the column change
+2. Builds an execution message from the task details
+3. Sends a wake event to OpenClaw's main session
+4. The Big Man receives the task and executes it
+
+### Execution Flow
+
+**User action:** Drag task "Review MoltHub posts" from To Do → In Progress
+
+**Server triggers:**
+```
+🚧 Auto-executing from Kanban:
+
+**Task:** Review MoltHub posts
+**Details:** From Hourly Checks
+**Tags:** heartbeat, hourly-checks
+
+Review MoltHub posts
+```
+
+**The Big Man receives this and executes the task automatically.**
+
+### Checking Execution Status
+
+View execution log:
+```bash
+curl http://127.0.0.1:18790/api/executions/log
+```
+
+View pending task queue (fallback):
+```bash
+curl http://127.0.0.1:18790/api/executions/queue
+```
+
+### Processing Task Queue
+
+During heartbeat, The Big Man should check for queued tasks:
+
+```bash
+# Check queue
+QUEUE=$(curl -s http://127.0.0.1:18790/api/executions/queue)
+
+# If queue not empty, process tasks
+if [ "$QUEUE" != "[]" ]; then
+    # Handle each task
+    # Then clear queue:
+    curl -X DELETE http://127.0.0.1:18790/api/executions/queue
+fi
+```
+
+### Execution Log Format
+
+```
+[2026-02-09T20:30:00.000Z] Executing task: Review MoltHub posts (abc-123-def)
+[2026-02-09T20:30:00.123Z] ✅ Injected: Review MoltHub posts
+```
 
 ## Common Patterns
 
