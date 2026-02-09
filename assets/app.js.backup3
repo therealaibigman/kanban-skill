@@ -150,9 +150,6 @@ function renderColumns(columns) {
     updateStats(columns);
 }
 
-let draggedCardElement = null;
-let draggedOverCard = null;
-
 function createCardElement(card) {
     const cardElement = document.createElement('div');
     cardElement.classList.add(
@@ -205,92 +202,23 @@ function createCardElement(card) {
         ${card.schedule === 'heartbeat' ? `<div class="text-xs text-pink-600 font-semibold">💓 Recurring</div>` : ''}
     `;
 
-    // Drag events for the card
+    // Drag events
     cardElement.addEventListener('dragstart', (e) => {
         draggedCard = card;
-        draggedCardElement = cardElement;
         cardElement.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
     });
 
     cardElement.addEventListener('dragend', () => {
         cardElement.classList.remove('dragging');
-        // Clear all drag-over effects
-        document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
         draggedCard = null;
-        draggedCardElement = null;
-        draggedOverCard = null;
     });
 
-    // Reordering: drag over other cards
-    cardElement.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent column drop from firing
-        
-        if (!draggedCardElement || draggedCardElement === cardElement) return;
-        
-        // Same column - show reorder indicator
-        if (card.column === draggedCard.column) {
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
-            cardElement.classList.add('drag-over');
-            draggedOverCard = cardElement;
-        }
-    });
-
-    cardElement.addEventListener('dragleave', (e) => {
-        cardElement.classList.remove('drag-over');
-    });
-
-    // Handle drop on card (reordering within same column)
-    cardElement.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        cardElement.classList.remove('drag-over');
-        
-        if (!draggedCard || draggedCardElement === cardElement) return;
-        
-        const targetColumn = card.column;
-        const sourceColumn = draggedCard.column;
-        
-        // Same column = reorder
-        if (targetColumn === sourceColumn) {
-            const container = cardElement.parentElement;
-            const allCards = Array.from(container.children);
-            const targetIndex = allCards.indexOf(cardElement);
-            
-            debugLog(`Reordering card ${draggedCard.title} to position ${targetIndex} in ${targetColumn}`);
-            
-            try {
-                const response = await fetch(`/api/cards/${draggedCard.id}/reorder`, {
-                    method: 'PUT',
-                    headers: authHeaders(),
-                    body: JSON.stringify({ 
-                        column: targetColumn,
-                        position: targetIndex
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to reorder card');
-                }
-                
-                await fetchCards();
-            } catch (error) {
-                console.error('Error reordering card:', error);
-                alert('Failed to reorder card');
-            }
-        }
-    });
-
-    // Click to edit (don't trigger during drag)
-    cardElement.addEventListener('click', (e) => {
-        if (cardElement.classList.contains('dragging')) return;
+    // Click to edit
+    cardElement.addEventListener('click', () => {
         openEditModal(card);
     });
 
     return cardElement;
-}
 }
 
 // Drag and drop setup
