@@ -216,7 +216,9 @@ function createCardElement(card) {
     cardElement.addEventListener('dragend', () => {
         cardElement.classList.remove('dragging');
         // Clear all drag-over effects
-        document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+        document.querySelectorAll('.card').forEach(c => {
+            c.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
         draggedCard = null;
         draggedCardElement = null;
         draggedOverCard = null;
@@ -225,20 +227,41 @@ function createCardElement(card) {
     // Reordering: drag over other cards
     cardElement.addEventListener('dragover', (e) => {
         e.preventDefault();
-        e.stopPropagation(); // Prevent column drop from firing
+        e.stopPropagation();
         
         if (!draggedCardElement || draggedCardElement === cardElement) return;
         
         // Same column - show reorder indicator
         if (card.column === draggedCard.column) {
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
-            cardElement.classList.add('drag-over');
+            // Clear all previous indicators
+            document.querySelectorAll('.card').forEach(c => {
+                c.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+            
+            // Determine if drop should be above or below
+            const rect = cardElement.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            const mouseY = e.clientY;
+            
+            if (mouseY < midpoint) {
+                // Drop above this card - show line on top
+                cardElement.classList.add('drag-over-top');
+            } else {
+                // Drop below this card - show line on bottom
+                cardElement.classList.add('drag-over-bottom');
+            }
+            
             draggedOverCard = cardElement;
         }
     });
 
     cardElement.addEventListener('dragleave', (e) => {
-        cardElement.classList.remove('drag-over');
+        // Only clear if actually leaving the element
+        const rect = cardElement.getBoundingClientRect();
+        if (e.clientX < rect.left || e.clientX >= rect.right || 
+            e.clientY < rect.top || e.clientY >= rect.bottom) {
+            cardElement.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
     });
 
     // Handle drop on card (reordering within same column)
@@ -246,7 +269,7 @@ function createCardElement(card) {
         e.preventDefault();
         e.stopPropagation();
         
-        cardElement.classList.remove('drag-over');
+        cardElement.classList.remove('drag-over-top', 'drag-over-bottom');
         
         if (!draggedCard || draggedCardElement === cardElement) return;
         
@@ -257,7 +280,16 @@ function createCardElement(card) {
         if (targetColumn === sourceColumn) {
             const container = cardElement.parentElement;
             const allCards = Array.from(container.children);
-            const targetIndex = allCards.indexOf(cardElement);
+            let targetIndex = allCards.indexOf(cardElement);
+            
+            // Check if we should drop below (insert after)
+            const rect = cardElement.getBoundingClientRect();
+            const mouseY = e.clientY;
+            const midpoint = rect.top + rect.height / 2;
+            
+            if (mouseY >= midpoint) {
+                targetIndex++; // Insert after this card
+            }
             
             debugLog(`Reordering card ${draggedCard.title} to position ${targetIndex} in ${targetColumn}`);
             
