@@ -4,24 +4,21 @@ let draggedCard = null;
 let currentCards = {}; // Track current card state for comparison
 let authToken = null;
 
-// Get auth token from URL param or localStorage
+// Get auth token from localStorage only
 function getAuthToken() {
     if (authToken) return authToken;
     
-    // Check URL param
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenParam = urlParams.get('token');
-    
-    if (tokenParam) {
-        authToken = tokenParam;
-        localStorage.setItem('kanban_token', tokenParam);
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return authToken;
-    }
-    
     // Check localStorage
     authToken = localStorage.getItem('kanban_token');
+    
+    // If no token, prompt user
+    if (!authToken) {
+        authToken = prompt('Enter your OpenClaw gateway token:\n\n(Find it in ~/.openclaw/openclaw.json under gateway.auth.token)');
+        if (authToken) {
+            localStorage.setItem('kanban_token', authToken);
+        }
+    }
+    
     return authToken;
 }
 
@@ -439,4 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Periodic updates
     setInterval(fetchCards, 5000);
     setInterval(processInProgressTasks, 10000);
+});
+// Logout button handler
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    if (confirm('Clear authentication token and logout?')) {
+        localStorage.removeItem('kanban_token');
+        authToken = null;
+        alert('Logged out. Page will reload.');
+        window.location.reload();
+    }
 });

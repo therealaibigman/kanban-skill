@@ -47,12 +47,15 @@ sudo systemctl enable kanban.service  # Auto-start on boot
 ### 3. Access the Web UI
 
 **Local:**
-- http://127.0.0.1:18790/kanban?token=YOUR_OPENCLAW_TOKEN
+- http://127.0.0.1:18790/kanban
 
 **Via NGINX (recommended):**
-- https://able-harp.exe.xyz/kanban?token=YOUR_OPENCLAW_TOKEN
+- https://able-harp.exe.xyz/kanban
 
-The token is saved to localStorage after first access.
+**On first visit:**
+- You'll be prompted to enter your OpenClaw gateway token
+- The token is securely stored in browser localStorage
+- Use the "Logout" button to clear it
 
 ### 4. Load Tasks from HEARTBEAT.md
 
@@ -71,9 +74,8 @@ curl -X POST http://127.0.0.1:18790/api/heartbeat/reload \
 The kanban server uses OpenClaw's gateway token for authentication. All API endpoints (except `/health`) require a valid token.
 
 **Token can be provided via:**
-1. `Authorization: Bearer <token>` header (recommended)
-2. `?token=<token>` URL parameter (for initial UI access)
-3. `openclaw_token` cookie
+1. `Authorization: Bearer <token>` header (API calls)
+2. `openclaw_token` cookie (browser)
 
 The token is loaded from `~/.openclaw/openclaw.json` at startup.
 
@@ -82,6 +84,7 @@ The token is loaded from `~/.openclaw/openclaw.json` at startup.
 - ✅ **Authenticated requests** - Full access to all endpoints
 - ❌ **Unauthenticated requests** - Rejected with 401 or 403
 - ✅ **Health check** - Always accessible (for monitoring)
+- 🔒 **No URL tokens** - Tokens never passed in URLs (security best practice)
 
 ### Network Security
 

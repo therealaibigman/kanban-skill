@@ -35,9 +35,8 @@ class AuthMiddleware {
             return next();
         }
 
-        // Check for token in various places
+        // Check for token in secure places only (NO URL params)
         const authHeader = req.headers['authorization'];
-        const queryToken = req.query.token;
         const cookieToken = req.cookies?.openclaw_token;
         
         let providedToken = null;
@@ -52,9 +51,9 @@ class AuthMiddleware {
             }
         }
         
-        // Fallback to query param or cookie
+        // Fallback to cookie only (no query params for security)
         if (!providedToken) {
-            providedToken = queryToken || cookieToken;
+            providedToken = cookieToken;
         }
         
         // Validate token
@@ -62,7 +61,7 @@ class AuthMiddleware {
             console.warn(`[Auth] Rejected ${req.method} ${req.path} - No token provided`);
             return res.status(401).json({ 
                 error: 'Authentication required',
-                message: 'Provide OpenClaw gateway token via Authorization header, ?token= param, or cookie'
+                message: 'Provide OpenClaw gateway token via Authorization header or cookie'
             });
         }
         
