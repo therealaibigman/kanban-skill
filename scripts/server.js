@@ -274,6 +274,65 @@ app.post('/api/heartbeat/sync', (req, res) => {
     }
 });
 
+// Archive endpoints
+app.post('/api/archive/:id', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const archivedCard = board.archiveCard(cardId);
+        res.json(archivedCard);
+    } catch (error) {
+        console.error('Error archiving card:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.post('/api/archive/all', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const result = board.archiveAllDone();
+        res.json(result);
+    } catch (error) {
+        console.error('Error archiving all:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/archive', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const limit = parseInt(req.query.limit) || 100;
+        const archive = board.getArchive(limit);
+        res.json(archive);
+    } catch (error) {
+        console.error('Error fetching archive:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/archive/:id', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const deletedCard = board.permanentlyDelete(cardId);
+        res.json(deletedCard);
+    } catch (error) {
+        console.error('Error permanently deleting:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.delete('/api/archive', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const result = board.clearArchive();
+        res.json(result);
+    } catch (error) {
+        console.error('Error clearing archive:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });

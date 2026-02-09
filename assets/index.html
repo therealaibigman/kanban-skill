@@ -149,6 +149,9 @@
                     <button id="reloadHeartbeatBtn" class="bg-green-500 text-white py-2 px-6 rounded-xl font-semibold hover:bg-green-600 transition-all transform hover:scale-105">
                         ↻ Sync Heartbeat
                     </button>
+                    <button id="archiveBtn" class="bg-blue-500 text-white py-2 px-6 rounded-xl font-semibold hover:bg-blue-600 transition-all transform hover:scale-105">
+                        📦 Archive
+                    </button>
                     <button id="logoutBtn" class="bg-red-500/80 text-white py-2 px-4 rounded-xl font-semibold hover:bg-red-600 transition-all">
                         🔓 Logout
                     </button>
@@ -281,6 +284,35 @@
                 <button id="cancelCardBtn" class="bg-white/20 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/30 transition-all">
                     Cancel
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archive Modal -->
+    <div id="archiveModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="glass rounded-3xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto card-shadow">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-3xl font-bold text-white">📦 Archive</h3>
+                <div class="flex gap-2">
+                    <button id="archiveAllDoneBtn" class="bg-blue-500 text-white py-2 px-4 rounded-xl font-semibold hover:bg-blue-600 transition-all text-sm">
+                        Archive All Done
+                    </button>
+                    <button id="clearArchiveBtn" class="bg-red-500 text-white py-2 px-4 rounded-xl font-semibold hover:bg-red-600 transition-all text-sm">
+                        Clear Archive
+                    </button>
+                    <button id="closeArchiveBtn" class="bg-white/20 text-white py-2 px-4 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                        Close
+                    </button>
+                </div>
+            </div>
+            
+            <div id="archiveList" class="space-y-3">
+                <!-- Archive items will be populated here -->
+            </div>
+            
+            <div id="archiveEmpty" class="hidden text-center text-white/60 py-12">
+                <p class="text-xl">Archive is empty</p>
+                <p class="text-sm mt-2">Completed tasks will appear here after archiving</p>
             </div>
         </div>
     </div>

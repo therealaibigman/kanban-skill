@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 class KanbanBoard {
     constructor() {
         this.dataFile = path.join(process.env.HOME, '.openclaw', 'kanban-board.json');
+        this.archiveFile = path.join(process.env.HOME, '.openclaw', 'kanban-archive.json');
         this.heartbeatFile = path.join(process.env.HOME, '.openclaw', 'workspace', 'HEARTBEAT.md');
         this.columns = {
             backlog: [],
@@ -12,7 +13,9 @@ class KanbanBoard {
             'in-progress': [],
             done: []
         };
+        this.archive = [];
         this.loadBoard();
+        this.loadArchive();
     }
 
     // Singleton pattern
@@ -289,6 +292,94 @@ class KanbanBoard {
 
     escapeRegex(str) {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    loadArchive() {
+        try {
+            if (fs.existsSync(this.archiveFile)) {
+                this.archive = fs.readJsonSync(this.archiveFile);
+            } else {
+                this.archive = [];
+                this.saveArchive();
+            }
+        } catch (error) {
+            console.error('Failed to load archive:', error);
+            this.archive = [];
+        }
+    }
+
+    saveArchive() {
+        try {
+            fs.ensureFileSync(this.archiveFile);
+            fs.writeJsonSync(this.archiveFile, this.archive, { spaces: 2 });
+        } catch (error) {
+            console.error('Failed to save archive:', error);
+        }
+    }
+
+    archiveCard(cardId) {
+        // Find card in done column
+        const doneColumn = this.columns.done;
+        const cardIndex = doneColumn.findIndex(card => card.id === cardId);
+        
+        if (cardIndex === -1) {
+            throw new Error(`Card ${cardId} not found in done column`);
+        }
+
+        // Move to archive
+        const [card] = doneColumn.splice(cardIndex, 1);
+        card.archivedAt = new Date().toISOString();
+        this.archive.unshift(card); // Add to beginning
+        
+        this.saveBoard();
+        this.saveArchive();
+        
+        console.log(`[Archive] Archived card: ${card.title}`);
+        return card;
+    }
+
+    archiveAllDone() {
+        const doneCards = [...this.columns.done];
+        const count = doneCards.length;
+        
+        doneCards.forEach(card => {
+            card.archivedAt = new Date().toISOString();
+            this.archive.unshift(card);
+        });
+        
+        this.columns.done = [];
+        
+        this.saveBoard();
+        this.saveArchive();
+        
+        console.log(`[Archive] Archived ${count} done cards`);
+        return { count, cards: doneCards };
+    }
+
+    getArchive(limit = 100) {
+        return this.archive.slice(0, limit);
+    }
+
+    permanentlyDelete(cardId) {
+        // Try to delete from archive
+        const archiveIndex = this.archive.findIndex(card => card.id === cardId);
+        
+        if (archiveIndex !== -1) {
+            const [deletedCard] = this.archive.splice(archiveIndex, 1);
+            this.saveArchive();
+            console.log(`[Archive] Permanently deleted: ${deletedCard.title}`);
+            return deletedCard;
+        }
+        
+        throw new Error(`Card ${cardId} not found in archive`);
+    }
+
+    clearArchive() {
+        const count = this.archive.length;
+        this.archive = [];
+        this.saveArchive();
+        console.log(`[Archive] Cleared ${count} archived cards`);
+        return { count };
     }
 }
 

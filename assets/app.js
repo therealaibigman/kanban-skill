@@ -480,3 +480,148 @@ document.getElementById('cardScheduleInput').addEventListener('change', (e) => {
         cronDiv.classList.add('hidden');
     }
 });
+
+// === ARCHIVE FUNCTIONS ===
+
+async function openArchiveModal() {
+    const modal = document.getElementById('archiveModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    await loadArchive();
+}
+
+function closeArchiveModal() {
+    const modal = document.getElementById('archiveModal');
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+}
+
+async function loadArchive() {
+    try {
+        const response = await fetch('/api/archive', {
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load archive');
+        }
+        
+        const archive = await response.json();
+        renderArchive(archive);
+    } catch (error) {
+        console.error('Error loading archive:', error);
+    }
+}
+
+function renderArchive(archive) {
+    const listDiv = document.getElementById('archiveList');
+    const emptyDiv = document.getElementById('archiveEmpty');
+    
+    if (archive.length === 0) {
+        listDiv.classList.add('hidden');
+        emptyDiv.classList.remove('hidden');
+        return;
+    }
+    
+    listDiv.classList.remove('hidden');
+    emptyDiv.classList.add('hidden');
+    
+    listDiv.innerHTML = archive.map(card => {
+        const archivedDate = new Date(card.archivedAt).toLocaleDateString();
+        const tagsHtml = card.tags ? card.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
+        
+        return `
+            <div class="bg-white/95 rounded-xl p-4 flex justify-between items-start">
+                <div class="flex-1">
+                    <h4 class="font-bold text-gray-800 mb-1">${card.title}</h4>
+                    <p class="text-gray-600 text-sm mb-2">${card.description || ''}</p>
+                    <div class="flex gap-2 items-center text-xs text-gray-500">
+                        <span class="font-semibold uppercase ${card.priority === 'high' ? 'text-red-600' : card.priority === 'medium' ? 'text-orange-600' : 'text-green-600'}">${card.priority}</span>
+                        <span>•</span>
+                        <span>Archived: ${archivedDate}</span>
+                    </div>
+                    ${tagsHtml ? `<div class="mt-2">${tagsHtml}</div>` : ''}
+                </div>
+                <button 
+                    class="bg-red-500 text-white py-1 px-3 rounded-lg font-semibold hover:bg-red-600 transition-all text-sm ml-4"
+                    onclick="permanentlyDeleteCard('${card.id}')"
+                >
+                    🗑️ Delete
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function archiveAllDone() {
+    if (!confirm('Archive all done tasks?')) return;
+    
+    try {
+        const response = await fetch('/api/archive/all', {
+            method: 'POST',
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to archive done tasks');
+        }
+        
+        const result = await response.json();
+        alert(`Archived ${result.count} tasks`);
+        
+        await fetchCards();
+        await loadArchive();
+    } catch (error) {
+        console.error('Error archiving done tasks:', error);
+        alert('Failed to archive done tasks');
+    }
+}
+
+async function permanentlyDeleteCard(cardId) {
+    if (!confirm('Permanently delete this task? This cannot be undone.')) return;
+    
+    try {
+        const response = await fetch(`/api/archive/${cardId}`, {
+            method: 'DELETE',
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete card');
+        }
+        
+        await loadArchive();
+    } catch (error) {
+        console.error('Error deleting card:', error);
+        alert('Failed to delete card');
+    }
+}
+
+async function clearArchive() {
+    if (!confirm('Clear entire archive? This will permanently delete all archived tasks.')) return;
+    
+    try {
+        const response = await fetch('/api/archive', {
+            method: 'DELETE',
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to clear archive');
+        }
+        
+        const result = await response.json();
+        alert(`Cleared ${result.count} archived tasks`);
+        
+        await loadArchive();
+    } catch (error) {
+        console.error('Error clearing archive:', error);
+        alert('Failed to clear archive');
+    }
+}
+
+// Archive button handlers
+document.getElementById('archiveBtn').addEventListener('click', openArchiveModal);
+document.getElementById('closeArchiveBtn').addEventListener('click', closeArchiveModal);
+document.getElementById('archiveAllDoneBtn').addEventListener('click', archiveAllDone);
+document.getElementById('clearArchiveBtn').addEventListener('click', clearArchive);
