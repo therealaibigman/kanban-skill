@@ -6,10 +6,17 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
+const multer = require('multer');
 const { exec } = require('child_process');
 const util = require('util');
 
 const execPromise = util.promisify(exec);
+
+// Multer for file uploads
+const upload = multer({ 
+    dest: '/tmp/',
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
+});
 
 const KanbanBoard = require('./models/board');
 const TaskExecutor = require('./task-executor');
@@ -380,6 +387,106 @@ app.put('/api/cards/:id/reorder', (req, res) => {
     } catch (error) {
         console.error('Error reordering card:', error);
         res.status(404).json({ error: error.message });
+    }
+});
+
+// Export/Import endpoints
+app.get('/api/export/json', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const data = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            columns: board.listCards(),
+            archive: board.getArchive()
+        };
+        
+        res.setHeader('Content-Disposition', 'attachment; filename="kanban-board.json"');
+        res.setHeader('Content-Type', 'application/json');
+        res.json(data);
+    } catch (error) {
+        console.error('Error exporting JSON:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/export/csv', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const columns = board.listCards();
+        
+        // Flatten all tasks
+        const allTasks = [];
+        for (const col in columns) {
+            columns[col].forEach(task => allTasks.push(task));
+        }
+        
+        // CSV header
+        let csv = 'Title,Description,Priority,Tags,Column,Schedule,DueDate,CreatedAt,UpdatedAt\n';
+        
+        // CSV rows
+        allTasks.forEach(task => {
+            const row = [
+                `"${(task.title || '').replace(/"/g, '""')}"`,
+                `"${(task.description || '').replace(/"/g, '""')}"`,
+                task.priority || 'medium',
+                `"${(task.tags || []).join(', ')}"`,
+                task.column,
+                task.schedule || 'once',
+                task.dueDate || '',
+                task.createdAt,
+                task.updatedAt
+            ];
+            csv += row.join(',') + '\n';
+        });
+        
+        res.setHeader('Content-Disposition', 'attachment; filename="kanban-board.csv"');
+        res.setHeader('Content-Type', 'text/csv');
+        res.send(csv);
+    } catch (error) {
+        console.error('Error exporting CSV:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/import/json', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        const fileContent = fs.readFileSync(req.file.path, 'utf8');
+        const importData = JSON.parse(fileContent);
+        
+        // Clean up temp file
+        fs.unlinkSync(req.file.path);
+        
+        const board = KanbanBoard.getInstance();
+        let imported = 0;
+        
+        // Import tasks from columns
+        if (importData.columns) {
+            for (const col in importData.columns) {
+                importData.columns[col].forEach(task => {
+                    // Avoid duplicates
+                    const exists = board.findTaskByTitle(task.title);
+                    if (!exists) {
+                        board.addCard(task);
+                        imported++;
+                    }
+                });
+            }
+        }
+        
+        res.json({ 
+            success: true, 
+            imported,
+            message: `Imported ${imported} tasks` 
+        });
+    } catch (error) {
+        console.error('Error importing JSON:', error);
+        if (req.file) fs.unlinkSync(req.file.path);
+        res.status(400).json({ error: error.message });
     }
 });
 

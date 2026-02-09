@@ -188,6 +188,12 @@
                     <button id="addCardBtn" class="bg-white text-purple-700 py-2 px-6 rounded-xl font-semibold hover:bg-white/90 transition-all transform hover:scale-105">
                         + Add Task
                     </button>
+                    <button id="exportBtn" class="bg-yellow-500 text-white py-2 px-6 rounded-xl font-semibold hover:bg-yellow-600 transition-all transform hover:scale-105">
+                        📥 Export
+                    </button>
+                    <button id="importBtn" class="bg-green-500 text-white py-2 px-6 rounded-xl font-semibold hover:bg-green-600 transition-all transform hover:scale-105">
+                        📤 Import
+                    </button>
                     <button id="archiveBtn" class="bg-blue-500 text-white py-2 px-6 rounded-xl font-semibold hover:bg-blue-600 transition-all transform hover:scale-105">
                         📦 Archive
                     </button>
@@ -356,6 +362,56 @@
                 <p class="text-xl">Archive is empty</p>
                 <p class="text-sm mt-2">Completed tasks will appear here after archiving</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="glass rounded-3xl p-8 w-full max-w-md card-shadow">
+            <h3 class="text-3xl font-bold text-white mb-6">📥 Export Board</h3>
+            
+            <div class="space-y-4">
+                <button id="exportJsonBtn" class="w-full bg-blue-500 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-600 transition-all transform hover:scale-105">
+                    📄 Export as JSON
+                </button>
+                <button id="exportCsvBtn" class="w-full bg-green-500 text-white py-4 px-6 rounded-xl font-semibold hover:bg-green-600 transition-all transform hover:scale-105">
+                    📊 Export as CSV
+                </button>
+            </div>
+            
+            <button id="closeExportBtn" class="w-full mt-6 bg-white/20 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="glass rounded-3xl p-8 w-full max-w-md card-shadow">
+            <h3 class="text-3xl font-bold text-white mb-6">📤 Import Tasks</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-white/90 text-sm font-semibold mb-2">Select JSON file</label>
+                    <input 
+                        type="file" 
+                        id="importFileInput" 
+                        accept=".json"
+                        class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-white/30 file:text-white hover:file:bg-white/40 file:cursor-pointer"
+                    >
+                </div>
+                
+                <button id="importJsonBtn" class="w-full bg-green-500 text-white py-4 px-6 rounded-xl font-semibold hover:bg-green-600 transition-all transform hover:scale-105">
+                    📤 Import from JSON
+                </button>
+                
+                <div id="importStatus" class="hidden bg-green-500/20 border border-green-500/50 text-white px-4 py-3 rounded-xl text-sm"></div>
+                <div id="importError" class="hidden bg-red-500/20 border border-red-500/50 text-white px-4 py-3 rounded-xl text-sm"></div>
+            </div>
+            
+            <button id="closeImportBtn" class="w-full mt-6 bg-white/20 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                Close
+            </button>
         </div>
     </div>
 

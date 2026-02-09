@@ -12,7 +12,8 @@
     "cors": "^2.8.5",
     "cookie-parser": "^1.4.6",
     "fs-extra": "^11.1.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "multer": "^1.4.5-lts.1"
   },
   "author": "theBigMan",
   "license": "MIT"

@@ -785,3 +785,142 @@ async function archiveCardFromModal() {
 
 // Archive button handler
 document.getElementById('archiveCardBtn').addEventListener('click', archiveCardFromModal);
+
+// === EXPORT/IMPORT ===
+
+function openExportModal() {
+    const modal = document.getElementById('exportModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+}
+
+function openImportModal() {
+    const modal = document.getElementById('importModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('importStatus').classList.add('hidden');
+    document.getElementById('importError').classList.add('hidden');
+}
+
+function closeImportModal() {
+    const modal = document.getElementById('importModal');
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+    document.getElementById('importFileInput').value = '';
+}
+
+async function exportJSON() {
+    try {
+        const response = await fetch('/api/export/json', {
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `kanban-board-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        closeExportModal();
+    } catch (error) {
+        console.error('Export error:', error);
+        alert('Failed to export JSON');
+    }
+}
+
+async function exportCSV() {
+    try {
+        const response = await fetch('/api/export/csv', {
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `kanban-board-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        closeExportModal();
+    } catch (error) {
+        console.error('Export error:', error);
+        alert('Failed to export CSV');
+    }
+}
+
+async function importJSON() {
+    const fileInput = document.getElementById('importFileInput');
+    const statusDiv = document.getElementById('importStatus');
+    const errorDiv = document.getElementById('importError');
+    
+    statusDiv.classList.add('hidden');
+    errorDiv.classList.add('hidden');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        errorDiv.textContent = 'Please select a file';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    try {
+        const response = await fetch('/api/import/json', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`
+            },
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            statusDiv.textContent = result.message;
+            statusDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                closeImportModal();
+                fetchCards();
+            }, 1500);
+        } else {
+            errorDiv.textContent = result.error || 'Import failed';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Import error:', error);
+        errorDiv.textContent = 'Import failed: ' + error.message;
+        errorDiv.classList.remove('hidden');
+    }
+}
+
+// Export/Import button handlers
+document.getElementById('exportBtn').addEventListener('click', openExportModal);
+document.getElementById('importBtn').addEventListener('click', openImportModal);
+document.getElementById('closeExportBtn').addEventListener('click', closeExportModal);
+document.getElementById('closeImportBtn').addEventListener('click', closeImportModal);
+document.getElementById('exportJsonBtn').addEventListener('click', exportJSON);
+document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+document.getElementById('importJsonBtn').addEventListener('click', importJSON);
