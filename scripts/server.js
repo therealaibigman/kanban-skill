@@ -333,6 +333,32 @@ app.delete('/api/archive', (req, res) => {
     }
 });
 
+app.post('/api/archive/:id/restore', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const restoredCard = board.restoreFromArchive(cardId);
+        res.json(restoredCard);
+    } catch (error) {
+        console.error('Error restoring card:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.put('/api/cards/:id/reorder', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const { column, position } = req.body;
+        
+        const columns = board.reorderCard(cardId, column, position);
+        res.json(columns);
+    } catch (error) {
+        console.error('Error reordering card:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });

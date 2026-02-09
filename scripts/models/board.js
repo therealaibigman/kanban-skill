@@ -381,6 +381,52 @@ class KanbanBoard {
         console.log(`[Archive] Cleared ${count} archived cards`);
         return { count };
     }
+
+    restoreFromArchive(cardId) {
+        const archiveIndex = this.archive.findIndex(card => card.id === cardId);
+        
+        if (archiveIndex === -1) {
+            throw new Error(`Card ${cardId} not found in archive`);
+        }
+
+        // Remove from archive
+        const [card] = this.archive.splice(archiveIndex, 1);
+        
+        // Remove archived timestamp
+        delete card.archivedAt;
+        
+        // Add back to done column
+        card.column = 'done';
+        card.updatedAt = new Date().toISOString();
+        this.columns.done.push(card);
+        
+        this.saveBoard();
+        this.saveArchive();
+        
+        console.log(`[Archive] Restored card: ${card.title}`);
+        return card;
+    }
+
+    reorderCard(cardId, column, newPosition) {
+        const columnCards = this.columns[column];
+        const oldIndex = columnCards.findIndex(card => card.id === cardId);
+        
+        if (oldIndex === -1) {
+            throw new Error(`Card ${cardId} not found in ${column} column`);
+        }
+
+        // Remove card from old position
+        const [card] = columnCards.splice(oldIndex, 1);
+        
+        // Insert at new position
+        columnCards.splice(newPosition, 0, card);
+        
+        card.updatedAt = new Date().toISOString();
+        this.saveBoard();
+        
+        console.log(`[Reorder] Moved ${card.title} from position ${oldIndex} to ${newPosition} in ${column}`);
+        return this.columns;
+    }
 }
 
 module.exports = KanbanBoard;
