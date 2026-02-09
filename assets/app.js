@@ -652,3 +652,37 @@ document.getElementById('archiveBtn').addEventListener('click', openArchiveModal
 document.getElementById('closeArchiveBtn').addEventListener('click', closeArchiveModal);
 document.getElementById('archiveAllDoneBtn').addEventListener('click', archiveAllDone);
 document.getElementById('clearArchiveBtn').addEventListener('click', clearArchive);
+
+// Archive card from modal
+async function archiveCardFromModal() {
+    const cardId = document.getElementById('cardIdInput').value;
+    const currentColumn = document.getElementById('cardCurrentColumn').value;
+    
+    if (!cardId) {
+        alert('No card selected');
+        return;
+    }
+    
+    if (!confirm('Archive this task?')) return;
+    
+    try {
+        const response = await fetch(`/api/archive/${cardId}`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ fromColumn: currentColumn })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to archive card');
+        }
+        
+        closeModal();
+        await fetchCards();
+    } catch (error) {
+        console.error('Error archiving card:', error);
+        alert('Failed to archive card');
+    }
+}
+
+// Archive button handler
+document.getElementById('archiveCardBtn').addEventListener('click', archiveCardFromModal);

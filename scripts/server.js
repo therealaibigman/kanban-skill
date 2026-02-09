@@ -54,11 +54,12 @@ async function createOpenClawCronJob(card) {
 // Helper: Delete OpenClaw cron job
 async function deleteOpenClawCronJob(jobId) {
     try {
-        const cmd = `openclaw cron rm ${jobId}`;
-        await execPromise(cmd);
-        console.log(`[Cron] Deleted job ${jobId}`);
+        const cmd = `openclaw cron rm ${jobId} 2>&1`;
+        const { stdout } = await execPromise(cmd);
+        console.log(`[Cron] Deleted job ${jobId}: ${stdout.trim()}`);
     } catch (error) {
-        console.error('[Cron] Failed to delete job:', error);
+        console.error(`[Cron] Failed to delete job ${jobId}:`, error.message);
+        // Don't throw - job might already be deleted
     }
 }
 
@@ -275,11 +276,25 @@ app.post('/api/heartbeat/sync', (req, res) => {
 });
 
 // Archive endpoints
-app.post('/api/archive/:id', (req, res) => {
+app.post('/api/archive/:id', async (req, res) => {
     try {
         const board = KanbanBoard.getInstance();
         const cardId = req.params.id;
-        const archivedCard = board.archiveCard(cardId);
+        const fromColumn = req.body.fromColumn || 'any';
+        
+        // Get card first to check for cron job
+        let card = null;
+        for (const col in board.columns) {
+            card = board.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+        
+        // Cancel cron job if exists
+        if (card && card.cronJobId) {
+            await deleteOpenClawCronJob(card.cronJobId);
+        }
+        
+        const archivedCard = board.archiveCard(cardId, fromColumn);
         res.json(archivedCard);
     } catch (error) {
         console.error('Error archiving card:', error);
@@ -287,9 +302,18 @@ app.post('/api/archive/:id', (req, res) => {
     }
 });
 
-app.post('/api/archive/all', (req, res) => {
+app.post('/api/archive/all', async (req, res) => {
     try {
         const board = KanbanBoard.getInstance();
+        
+        // Cancel all cron jobs for done tasks
+        const doneCards = board.columns.done;
+        for (const card of doneCards) {
+            if (card.cronJobId) {
+                await deleteOpenClawCronJob(card.cronJobId);
+            }
+        }
+        
         const result = board.archiveAllDone();
         res.json(result);
     } catch (error) {

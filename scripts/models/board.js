@@ -317,24 +317,50 @@ class KanbanBoard {
         }
     }
 
-    archiveCard(cardId) {
-        // Find card in done column
-        const doneColumn = this.columns.done;
-        const cardIndex = doneColumn.findIndex(card => card.id === cardId);
+    archiveCard(cardId, fromColumn = 'done') {
+        // Find card in specified column (or search all)
+        let card = null;
+        let cardIndex = -1;
+        let sourceColumn = fromColumn;
         
-        if (cardIndex === -1) {
-            throw new Error(`Card ${cardId} not found in done column`);
+        if (fromColumn === 'any') {
+            // Search all columns
+            for (const col in this.columns) {
+                cardIndex = this.columns[col].findIndex(c => c.id === cardId);
+                if (cardIndex !== -1) {
+                    sourceColumn = col;
+                    card = this.columns[col][cardIndex];
+                    break;
+                }
+            }
+        } else {
+            const column = this.columns[fromColumn];
+            cardIndex = column.findIndex(c => c.id === cardId);
+            if (cardIndex !== -1) {
+                card = column[cardIndex];
+            }
+        }
+        
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
         }
 
-        // Move to archive
-        const [card] = doneColumn.splice(cardIndex, 1);
+        // Remove from source column
+        this.columns[sourceColumn].splice(cardIndex, 1);
+        
+        // Disable recurrence (heartbeat/cron)
+        if (card.schedule === 'heartbeat') {
+            card.schedule = 'once'; // Convert to one-time
+        }
+        // Cron jobs will be cancelled by server
+        
         card.archivedAt = new Date().toISOString();
         this.archive.unshift(card); // Add to beginning
         
         this.saveBoard();
         this.saveArchive();
         
-        console.log(`[Archive] Archived card: ${card.title}`);
+        console.log(`[Archive] Archived card: ${card.title} from ${sourceColumn}`);
         return card;
     }
 
