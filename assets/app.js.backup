@@ -243,7 +243,9 @@ async function saveCard() {
         
         const response = await fetch(url, {
             method,
-            headers: authHeaders(),
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ 
                 title, 
                 description, 
@@ -272,8 +274,7 @@ async function deleteCard() {
 
     try {
         const response = await fetch(`/api/cards/${cardId}`, {
-            method: 'DELETE',
-            headers: authHeaders()
+            method: 'DELETE'
         });
 
         if (!response.ok) {
@@ -291,8 +292,7 @@ async function reloadHeartbeatTasks() {
     debugLog('Reloading heartbeat tasks');
     try {
         const response = await fetch('/api/heartbeat/reload', {
-            method: 'POST',
-            headers: authHeaders()
+            method: 'POST'
         });
 
         if (!response.ok) {
@@ -328,7 +328,9 @@ function setupDragAndDrop() {
             try {
                 const response = await fetch(`/api/cards/${cardId}/move`, {
                     method: 'PUT',
-                    headers: authHeaders(),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ fromColumn, toColumn })
                 });
 
@@ -357,7 +359,9 @@ async function processInProgressTasks() {
     try {
         const response = await fetch('/api/cards/process-tasks', {
             method: 'POST',
-            headers: authHeaders()
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
         if (!response.ok) {

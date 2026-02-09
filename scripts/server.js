@@ -5,9 +5,11 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const cookieParser = require('cookie-parser');
 
 const KanbanBoard = require('./models/board');
 const TaskExecutor = require('./task-executor');
+const AuthMiddleware = require('./auth-middleware');
 
 const app = express();
 const PORT = process.env.KANBAN_PORT || 18790;
@@ -16,15 +18,25 @@ const PORT = process.env.KANBAN_PORT || 18790;
 const SKILL_DIR = path.dirname(__dirname);
 const ASSETS_DIR = path.join(SKILL_DIR, 'assets');
 
+// Initialize auth
+const auth = new AuthMiddleware();
+
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 // Logging middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
 });
+
+// Authentication middleware - protect all routes except health check
+app.use(auth.middleware());
 
 // Serve static assets
 app.use('/kanban', express.static(ASSETS_DIR, {
