@@ -20,30 +20,28 @@ const PORT = process.env.KANBAN_PORT || 18790;
 
 // Helper: Create OpenClaw cron job
 async function createOpenClawCronJob(card) {
-    const jobPayload = {
-        name: `Kanban: ${card.title}`,
-        schedule: {
-            kind: 'cron',
-            expr: card.cronExpression,
-            tz: 'UTC'
-        },
-        payload: {
-            kind: 'systemEvent',
-            text: `🚧 Scheduled task from Kanban:\n\n**${card.title}**\n${card.description || ''}\n\nPriority: ${card.priority}\nSchedule: ${card.cronExpression}`
-        },
-        sessionTarget: 'main',
-        enabled: true
-    };
+    const eventText = `🚧 Scheduled task from Kanban:\n\n**${card.title}**\n${card.description || ''}\n\nPriority: ${card.priority}\nSchedule: ${card.cronExpression}`;
     
     try {
-        // Call OpenClaw cron API
-        const cmd = `curl -s -X POST http://127.0.0.1:18789/rpc \
-            -H "Content-Type: application/json" \
-            -d '{"method":"cron.add","params":{"job":${JSON.stringify(jobPayload).replace(/'/g, "'\\''")}}}' \
-            | jq -r '.result.jobId'`;
+        // Use OpenClaw CLI to create cron job
+        const cmd = `openclaw cron add \
+            --name "Kanban: ${card.title.replace(/"/g, '\\"')}" \
+            --cron "${card.cronExpression}" \
+            --system-event "${eventText.replace(/"/g, '\\"').replace(/\n/g, ' ')}" \
+            --session main \
+            --json | jq -r '.jobId'`;
         
-        const { stdout } = await execPromise(cmd);
+        const { stdout, stderr } = await execPromise(cmd);
+        
+        if (stderr) {
+            console.error('[Cron] stderr:', stderr);
+        }
+        
         const jobId = stdout.trim();
+        
+        if (!jobId || jobId === 'null') {
+            throw new Error('Failed to get jobId from cron add command');
+        }
         
         console.log(`[Cron] Created job ${jobId} for task ${card.id}`);
         return jobId;
@@ -56,10 +54,7 @@ async function createOpenClawCronJob(card) {
 // Helper: Delete OpenClaw cron job
 async function deleteOpenClawCronJob(jobId) {
     try {
-        const cmd = `curl -s -X POST http://127.0.0.1:18789/rpc \
-            -H "Content-Type: application/json" \
-            -d '{"method":"cron.remove","params":{"jobId":"${jobId}"}}'`;
-        
+        const cmd = `openclaw cron rm ${jobId}`;
         await execPromise(cmd);
         console.log(`[Cron] Deleted job ${jobId}`);
     } catch (error) {
