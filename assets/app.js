@@ -182,14 +182,24 @@ function createCardElement(card) {
         high: 'text-red-600'
     };
     
+    const scheduleIcons = {
+        once: '',
+        heartbeat: '💓',
+        cron: '⏰'
+    };
+    
+    const scheduleIcon = scheduleIcons[card.schedule] || '';
+    
     cardElement.innerHTML = `
         <div class="flex justify-between items-start mb-2">
-            <h3 class="font-bold text-gray-800 text-lg flex-1">${card.title || 'Untitled Card'}</h3>
+            <h3 class="font-bold text-gray-800 text-lg flex-1">${scheduleIcon} ${card.title || 'Untitled Card'}</h3>
             <span class="text-xs font-bold uppercase ${priorityColors[card.priority] || 'text-gray-600'}">${card.priority || 'medium'}</span>
         </div>
         ${tagsHtml}
         <p class="text-gray-600 text-sm mb-2">${card.description || ''}</p>
         ${card.dueDate ? `<div class="text-xs text-purple-600 font-semibold">📅 ${card.dueDate}</div>` : ''}
+        ${card.schedule === 'cron' && card.cronExpression ? `<div class="text-xs text-blue-600 font-semibold">⏰ ${card.cronExpression}</div>` : ''}
+        ${card.schedule === 'heartbeat' ? `<div class="text-xs text-pink-600 font-semibold">💓 Recurring</div>` : ''}
     `;
 
     // Drag events
@@ -303,6 +313,16 @@ function openEditModal(card) {
     document.getElementById('cardPriorityInput').value = card.priority;
     document.getElementById('cardTagsInput').value = card.tags ? card.tags.join(', ') : '';
     document.getElementById('cardDueDateInput').value = card.dueDate || '';
+    document.getElementById('cardScheduleInput').value = card.schedule || 'once';
+    document.getElementById('cardCronInput').value = card.cronExpression || '';
+    
+    // Show/hide cron expression field
+    const cronDiv = document.getElementById('cronExpressionDiv');
+    if (card.schedule === 'cron') {
+        cronDiv.classList.remove('hidden');
+    } else {
+        cronDiv.classList.add('hidden');
+    }
 
     modalTitle.textContent = 'Edit Task';
     
@@ -329,22 +349,32 @@ async function saveCard() {
         .map(tag => tag.trim())
         .filter(tag => tag !== '');
     const dueDate = document.getElementById('cardDueDateInput').value;
+    const schedule = document.getElementById('cardScheduleInput').value;
+    const cronExpression = document.getElementById('cardCronInput').value;
 
     try {
         const url = cardId ? `/api/cards/${cardId}` : '/api/cards';
         const method = cardId ? 'PUT' : 'POST';
         
+        const payload = { 
+            title, 
+            description, 
+            priority, 
+            tags,
+            dueDate,
+            column: currentColumn,
+            schedule
+        };
+        
+        // Add cron expression if schedule is cron
+        if (schedule === 'cron' && cronExpression) {
+            payload.cronExpression = cronExpression;
+        }
+        
         const response = await fetch(url, {
             method,
             headers: authHeaders(),
-            body: JSON.stringify({ 
-                title, 
-                description, 
-                priority, 
-                tags,
-                dueDate,
-                column: currentColumn
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -415,7 +445,12 @@ document.getElementById('addCardBtn').addEventListener('click', () => {
     document.getElementById('cardPriorityInput').value = 'medium';
     document.getElementById('cardTagsInput').value = '';
     document.getElementById('cardDueDateInput').value = '';
+    document.getElementById('cardScheduleInput').value = 'once';
+    document.getElementById('cardCronInput').value = '';
     document.getElementById('modalTitle').textContent = 'Add Task';
+    
+    // Hide cron field by default
+    document.getElementById('cronExpressionDiv').classList.add('hidden');
     
     const modal = document.getElementById('cardModal');
     modal.classList.remove('hidden');
@@ -432,3 +467,13 @@ if (checkAuth()) {
     fetchCards();
     setInterval(fetchCards, 5000);
 }
+
+// Schedule type change handler
+document.getElementById('cardScheduleInput').addEventListener('change', (e) => {
+    const cronDiv = document.getElementById('cronExpressionDiv');
+    if (e.target.value === 'cron') {
+        cronDiv.classList.remove('hidden');
+    } else {
+        cronDiv.classList.add('hidden');
+    }
+});

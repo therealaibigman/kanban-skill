@@ -239,6 +239,21 @@
                 </div>
                 
                 <div>
+                    <label class="block text-white/90 text-sm font-semibold mb-2">Schedule Type</label>
+                    <select id="cardScheduleInput" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50">
+                        <option value="once" selected>Once - One-time task</option>
+                        <option value="heartbeat">Heartbeat - Recurring (synced with HEARTBEAT.md)</option>
+                        <option value="cron">Cron - Scheduled (creates OpenClaw cron job)</option>
+                    </select>
+                </div>
+                
+                <div id="cronExpressionDiv" class="hidden">
+                    <label class="block text-white/90 text-sm font-semibold mb-2">Cron Expression</label>
+                    <input type="text" id="cardCronInput" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="0 9 * * * (9 AM daily)">
+                    <p class="text-white/60 text-xs mt-1">Examples: "0 9 * * *" (9 AM daily), "0 */6 * * *" (every 6 hours)</p>
+                </div>
+                
+                <div>
                     <label class="block text-white/90 text-sm font-semibold mb-2">Tags (comma-separated)</label>
                     <input type="text" id="cardTagsInput" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50">
                 </div>

@@ -6,6 +6,10 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
+const { exec } = require('child_process');
+const util = require('util');
+
+const execPromise = util.promisify(exec);
 
 const KanbanBoard = require('./models/board');
 const TaskExecutor = require('./task-executor');
@@ -13,6 +17,55 @@ const AuthMiddleware = require('./auth-middleware');
 
 const app = express();
 const PORT = process.env.KANBAN_PORT || 18790;
+
+// Helper: Create OpenClaw cron job
+async function createOpenClawCronJob(card) {
+    const jobPayload = {
+        name: `Kanban: ${card.title}`,
+        schedule: {
+            kind: 'cron',
+            expr: card.cronExpression,
+            tz: 'UTC'
+        },
+        payload: {
+            kind: 'systemEvent',
+            text: `🚧 Scheduled task from Kanban:\n\n**${card.title}**\n${card.description || ''}\n\nPriority: ${card.priority}\nSchedule: ${card.cronExpression}`
+        },
+        sessionTarget: 'main',
+        enabled: true
+    };
+    
+    try {
+        // Call OpenClaw cron API
+        const cmd = `curl -s -X POST http://127.0.0.1:18789/rpc \
+            -H "Content-Type: application/json" \
+            -d '{"method":"cron.add","params":{"job":${JSON.stringify(jobPayload).replace(/'/g, "'\\''")}}}' \
+            | jq -r '.result.jobId'`;
+        
+        const { stdout } = await execPromise(cmd);
+        const jobId = stdout.trim();
+        
+        console.log(`[Cron] Created job ${jobId} for task ${card.id}`);
+        return jobId;
+    } catch (error) {
+        console.error('[Cron] Failed to create job:', error);
+        throw error;
+    }
+}
+
+// Helper: Delete OpenClaw cron job
+async function deleteOpenClawCronJob(jobId) {
+    try {
+        const cmd = `curl -s -X POST http://127.0.0.1:18789/rpc \
+            -H "Content-Type: application/json" \
+            -d '{"method":"cron.remove","params":{"jobId":"${jobId}"}}'`;
+        
+        await execPromise(cmd);
+        console.log(`[Cron] Deleted job ${jobId}`);
+    } catch (error) {
+        console.error('[Cron] Failed to delete job:', error);
+    }
+}
 
 // Skill directory paths
 const SKILL_DIR = path.dirname(__dirname);
@@ -84,11 +137,24 @@ app.get('/api/cards', (req, res) => {
     }
 });
 
-app.post('/api/cards', (req, res) => {
+app.post('/api/cards', async (req, res) => {
     try {
         const board = KanbanBoard.getInstance();
         const cardData = req.body;
         const newCard = board.addCard(cardData);
+        
+        // If cron schedule, create OpenClaw cron job
+        if (newCard.schedule === 'cron' && newCard.cronExpression) {
+            try {
+                const cronJobId = await createOpenClawCronJob(newCard);
+                newCard.cronJobId = cronJobId;
+                board.updateCard(newCard.id, { cronJobId });
+            } catch (error) {
+                console.error('Failed to create cron job:', error);
+                // Task is still created, just without cron job
+            }
+        }
+        
         res.status(201).json(newCard);
     } catch (error) {
         console.error('Error adding card:', error);
@@ -109,10 +175,23 @@ app.put('/api/cards/:id', (req, res) => {
     }
 });
 
-app.delete('/api/cards/:id', (req, res) => {
+app.delete('/api/cards/:id', async (req, res) => {
     try {
         const board = KanbanBoard.getInstance();
         const cardId = req.params.id;
+        
+        // Get card first to check for cron job
+        let card = null;
+        for (const col in board.columns) {
+            card = board.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+        
+        // Delete cron job if exists
+        if (card && card.cronJobId) {
+            await deleteOpenClawCronJob(card.cronJobId);
+        }
+        
         const deletedCard = board.deleteCard(cardId);
         res.json(deletedCard);
     } catch (error) {

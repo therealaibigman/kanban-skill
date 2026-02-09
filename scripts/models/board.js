@@ -132,13 +132,35 @@ class KanbanBoard {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             dueDate: options.dueDate || null,
-            column: 'todo'
+            column: 'todo',
+            schedule: options.schedule || 'once', // once, heartbeat, cron
+            cronExpression: options.cronExpression || null,
+            cronJobId: options.cronJobId || null
         };
 
         // Always add to todo column
         this.columns.todo.push(card);
         this.saveBoard();
+        
+        // If cron schedule, create OpenClaw cron job
+        if (card.schedule === 'cron' && card.cronExpression) {
+            this.createCronJob(card);
+        }
+        
         return card;
+    }
+
+    createCronJob(card) {
+        // This will be called via API endpoint to create OpenClaw cron job
+        console.log(`[Cron] Task ${card.id} needs cron job: ${card.cronExpression}`);
+        // The actual cron creation happens in the server via OpenClaw API
+    }
+
+    deleteCronJob(card) {
+        if (card.cronJobId) {
+            console.log(`[Cron] Deleting cron job ${card.cronJobId} for task ${card.id}`);
+            // The actual cron deletion happens in the server via OpenClaw API
+        }
     }
 
     updateCard(cardId, updates) {
@@ -193,6 +215,10 @@ class KanbanBoard {
             
             if (cardIndex !== -1) {
                 const deletedCard = column.splice(cardIndex, 1)[0];
+                
+                // Delete associated cron job if exists
+                this.deleteCronJob(deletedCard);
+                
                 this.saveBoard();
                 return deletedCard;
             }
