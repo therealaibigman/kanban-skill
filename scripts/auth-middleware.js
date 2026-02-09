@@ -10,6 +10,7 @@ class AuthMiddleware {
     constructor() {
         this.configPath = path.join(process.env.HOME, '.openclaw', 'openclaw.json');
         this.validToken = null;
+        this.validPassword = null;
         this.loadToken();
     }
 
@@ -17,15 +18,34 @@ class AuthMiddleware {
         try {
             const config = fs.readJsonSync(this.configPath);
             this.validToken = config?.gateway?.auth?.token;
+            this.validPassword = config?.gateway?.auth?.password || process.env.KANBAN_PASSWORD;
             
             if (!this.validToken) {
                 console.warn('[Auth] No gateway token found in config, auth will fail');
             } else {
                 console.log('[Auth] Loaded gateway token from config');
             }
+            
+            if (!this.validPassword) {
+                console.warn('[Auth] No password configured, password login disabled');
+            } else {
+                console.log('[Auth] Password login enabled');
+            }
         } catch (error) {
             console.error('[Auth] Failed to load config:', error.message);
         }
+    }
+
+    validatePassword(password) {
+        if (!this.validPassword) {
+            return { valid: false, error: 'Password authentication not configured' };
+        }
+        
+        if (password === this.validPassword) {
+            return { valid: true, token: this.validToken };
+        }
+        
+        return { valid: false, error: 'Invalid password' };
     }
 
     // Middleware function

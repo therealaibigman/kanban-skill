@@ -35,7 +35,32 @@ app.use((req, res, next) => {
     next();
 });
 
-// Authentication middleware - protect all routes except health check
+// Login endpoint (before auth middleware)
+app.post('/api/auth/login', (req, res) => {
+    const { password } = req.body;
+    
+    if (!password) {
+        return res.status(400).json({ error: 'Password required' });
+    }
+    
+    const result = auth.validatePassword(password);
+    
+    if (result.valid) {
+        console.log('[Auth] Successful password login');
+        res.json({ 
+            success: true, 
+            token: result.token,
+            message: 'Login successful'
+        });
+    } else {
+        console.warn('[Auth] Failed password login attempt');
+        res.status(401).json({ 
+            error: result.error || 'Invalid password'
+        });
+    }
+});
+
+// Authentication middleware - protect all routes except health check and login
 app.use(auth.middleware());
 
 // Serve static assets

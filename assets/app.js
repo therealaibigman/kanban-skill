@@ -1,28 +1,27 @@
-// The Big Man's Kanban Board Client
+// The Big Man's Kanban Board Client - Modern Dashboard Edition
 
 let draggedCard = null;
 let currentCards = {}; // Track current card state for comparison
 let authToken = null;
 
-// Get auth token from localStorage only
+// === AUTH & LOGIN ===
+
 function getAuthToken() {
     if (authToken) return authToken;
-    
-    // Check localStorage
     authToken = localStorage.getItem('kanban_token');
-    
-    // If no token, prompt user
-    if (!authToken) {
-        authToken = prompt('Enter your OpenClaw gateway token:\n\n(Find it in ~/.openclaw/openclaw.json under gateway.auth.token)');
-        if (authToken) {
-            localStorage.setItem('kanban_token', authToken);
-        }
-    }
-    
     return authToken;
 }
 
-// Add auth header to fetch requests
+function setAuthToken(token) {
+    authToken = token;
+    localStorage.setItem('kanban_token', token);
+}
+
+function clearAuthToken() {
+    authToken = null;
+    localStorage.removeItem('kanban_token');
+}
+
 function authHeaders() {
     const token = getAuthToken();
     const headers = {
@@ -36,14 +35,87 @@ function authHeaders() {
     return headers;
 }
 
-// Debugging helper
-function debugLog(...args) {
-    console.log('[Kanban Debug]', ...args);
+function checkAuth() {
+    const token = getAuthToken();
+    
+    if (!token) {
+        showLoginScreen();
+        return false;
+    }
+    
+    showDashboard();
+    return true;
 }
 
-// Compare current cards with new cards
+function showLoginScreen() {
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('loginScreen').classList.add('flex');
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('passwordInput').focus();
+}
+
+function showDashboard() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    fetchCards(); // Load initial data
+}
+
+// Login form handler
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const password = document.getElementById('passwordInput').value;
+    const errorDiv = document.getElementById('loginError');
+    
+    errorDiv.classList.add('hidden');
+    
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            setAuthToken(data.token);
+            showDashboard();
+        } else {
+            errorDiv.textContent = data.error || 'Login failed';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        errorDiv.textContent = 'Login failed: ' + error.message;
+        errorDiv.classList.remove('hidden');
+    }
+});
+
+// Logout button
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    if (confirm('Logout and clear authentication?')) {
+        clearAuthToken();
+        showLoginScreen();
+    }
+});
+
+// === KANBAN LOGIC ===
+
+function debugLog(...args) {
+    console.log('[Kanban]', ...args);
+}
+
+function updateStats(columns) {
+    document.getElementById('statBacklog').textContent = columns.backlog.length;
+    document.getElementById('statTodo').textContent = columns.todo.length;
+    document.getElementById('statInProgress').textContent = columns['in-progress'].length;
+    document.getElementById('statDone').textContent = columns.done.length;
+}
+
 function cardsHaveChanged(newColumns) {
-    // Simple deep comparison
     const stringifyCards = (columns) => {
         return Object.entries(columns).map(([col, cards]) => 
             cards.map(card => `${card.id}-${card.column}-${card.updatedAt}`).join('|')
@@ -56,7 +128,6 @@ function cardsHaveChanged(newColumns) {
     return oldCardsString !== newCardsString;
 }
 
-// Render columns with cards
 function renderColumns(columns) {
     debugLog('Rendering columns:', columns);
     const columnNames = ['backlog', 'todo', 'in-progress', 'done'];
@@ -68,136 +139,163 @@ function renderColumns(columns) {
             return;
         }
         
-        columnContainer.innerHTML = ''; // Clear existing cards
+        columnContainer.innerHTML = ''; 
 
         (columns[columnName] || []).forEach(card => {
             const cardElement = createCardElement(card);
             columnContainer.appendChild(cardElement);
         });
     });
+    
+    updateStats(columns);
 }
 
-// Create card element
 function createCardElement(card) {
     const cardElement = document.createElement('div');
     cardElement.classList.add(
         'card', 
-        'bg-white', 
-        'rounded-lg', 
+        'bg-white/95',
+        'backdrop-blur-sm',
+        'rounded-xl', 
         'p-4', 
-        'shadow-md', 
+        'shadow-lg',
         'cursor-move',
+        'hover:shadow-xl',
+        'transition-all',
+        'hover:scale-105',
         `priority-${card.priority}`
     );
     cardElement.setAttribute('draggable', true);
     cardElement.dataset.cardId = card.id;
     cardElement.dataset.column = card.column;
     
+    let tagsHtml = '';
+    if (card.tags && card.tags.length > 0) {
+        tagsHtml = '<div class="mb-2">' + 
+            card.tags.map(tag => `<span class="tag">${tag}</span>`).join('') + 
+            '</div>';
+    }
+    
+    const priorityColors = {
+        low: 'text-green-600',
+        medium: 'text-orange-600',
+        high: 'text-red-600'
+    };
+    
     cardElement.innerHTML = `
-        <div class="flex justify-between items-start">
-            <h3 class="font-bold text-lg mb-2">${card.title || 'Untitled Card'}</h3>
-            <span class="text-xs text-gray-500 font-semibold uppercase">${card.priority || 'medium'}</span>
+        <div class="flex justify-between items-start mb-2">
+            <h3 class="font-bold text-gray-800 text-lg flex-1">${card.title || 'Untitled Card'}</h3>
+            <span class="text-xs font-bold uppercase ${priorityColors[card.priority] || 'text-gray-600'}">${card.priority || 'medium'}</span>
         </div>
-        <p class="text-gray-600 mb-2">${card.description || ''}</p>
-        <div class="text-xs text-gray-500">Status: ${card.status || 'pending'}</div>
+        ${tagsHtml}
+        <p class="text-gray-600 text-sm mb-2">${card.description || ''}</p>
+        ${card.dueDate ? `<div class="text-xs text-purple-600 font-semibold">📅 ${card.dueDate}</div>` : ''}
     `;
 
-    // Tags
-    if (card.tags && card.tags.length > 0) {
-        const tagsContainer = document.createElement('div');
-        tagsContainer.classList.add('tags-container', 'mb-2');
-        card.tags.forEach(tag => {
-            const tagElement = document.createElement('span');
-            tagElement.classList.add('tag');
-            tagElement.textContent = tag;
-            tagsContainer.appendChild(tagElement);
-        });
-        cardElement.appendChild(tagsContainer);
-    }
-
-    // Due date
-    if (card.dueDate) {
-        const dueDateElement = document.createElement('div');
-        dueDateElement.classList.add('text-xs', 'text-gray-500');
-        const formattedDate = new Date(card.dueDate).toLocaleDateString();
-        dueDateElement.textContent = `Due: ${formattedDate}`;
-        cardElement.appendChild(dueDateElement);
-    }
-
     // Drag events
-    cardElement.addEventListener('dragstart', dragStart);
-    cardElement.addEventListener('dragend', dragEnd);
-    cardElement.addEventListener('click', () => openEditModal(card));
-    
+    cardElement.addEventListener('dragstart', (e) => {
+        draggedCard = card;
+        cardElement.classList.add('dragging');
+    });
+
+    cardElement.addEventListener('dragend', () => {
+        cardElement.classList.remove('dragging');
+        draggedCard = null;
+    });
+
+    // Click to edit
+    cardElement.addEventListener('click', () => {
+        openEditModal(card);
+    });
+
     return cardElement;
 }
 
-// Fetch and render cards
+// Drag and drop setup
+document.querySelectorAll('.card-container').forEach(container => {
+    container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        container.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+    });
+
+    container.addEventListener('dragleave', () => {
+        container.style.backgroundColor = '';
+    });
+
+    container.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        container.style.backgroundColor = '';
+        
+        if (!draggedCard) return;
+
+        const toColumn = container.dataset.column;
+        const fromColumn = draggedCard.column;
+
+        if (fromColumn === toColumn) return;
+
+        debugLog(`Moving card ${draggedCard.id} from ${fromColumn} to ${toColumn}`);
+
+        try {
+            const response = await fetch(`/api/cards/${draggedCard.id}/move`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify({ fromColumn, toColumn })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to move card');
+            }
+
+            await fetchCards();
+        } catch (error) {
+            console.error('Error moving card:', error);
+            alert('Failed to move card');
+        }
+    });
+});
+
 async function fetchCards() {
     debugLog('Fetching cards...');
     try {
         const response = await fetch('/api/cards', {
             headers: authHeaders()
         });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
         
-        const columns = await response.json();
-        debugLog('Fetched columns:', columns);
-        
-        // Check if cards have changed
-        if (!cardsHaveChanged(columns)) {
-            debugLog('Cards have not changed');
+        if (response.status === 401 || response.status === 403) {
+            clearAuthToken();
+            showLoginScreen();
             return;
         }
 
-        currentCards = columns;
-        renderColumns(columns);
+        if (!response.ok) {
+            throw new Error('Failed to fetch cards');
+        }
+
+        const newColumns = await response.json();
+
+        if (cardsHaveChanged(newColumns)) {
+            debugLog('Cards have changed, re-rendering');
+            currentCards = newColumns;
+            renderColumns(newColumns);
+        } else {
+            debugLog('No changes detected, skipping render');
+        }
     } catch (error) {
         console.error('Failed to fetch cards:', error);
     }
 }
 
-// Modal functionality
-function openAddModal() {
-    debugLog('Opening add modal');
-    const modal = document.getElementById('cardModal');
-    const modalTitle = document.getElementById('modalTitle');
-    
-    if (!modal || !modalTitle) {
-        console.error('Modal elements not found');
-        return;
-    }
-
-    // Reset form
-    document.getElementById('cardIdInput').value = '';
-    document.getElementById('cardCurrentColumn').value = 'backlog';
-    document.getElementById('cardTitleInput').value = '';
-    document.getElementById('cardDescriptionInput').value = '';
-    document.getElementById('cardPriorityInput').value = 'medium';
-    document.getElementById('cardTagsInput').value = '';
-    document.getElementById('cardDueDateInput').value = '';
-
-    // Update modal title
-    modalTitle.textContent = 'Add New Card';
-    
-    // Show modal
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
+// Modal functions
 function openEditModal(card) {
-    debugLog('Opening edit modal', card);
+    debugLog('Opening edit modal for card:', card);
     const modal = document.getElementById('cardModal');
     const modalTitle = document.getElementById('modalTitle');
-    
-    if (!modal || !modalTitle) {
-        console.error('Modal elements not found');
+
+    if (!card) {
+        console.error('Card not provided to openEditModal');
         return;
     }
 
-    // Populate form
     document.getElementById('cardIdInput').value = card.id;
     document.getElementById('cardCurrentColumn').value = card.column;
     document.getElementById('cardTitleInput').value = card.title;
@@ -206,10 +304,8 @@ function openEditModal(card) {
     document.getElementById('cardTagsInput').value = card.tags ? card.tags.join(', ') : '';
     document.getElementById('cardDueDateInput').value = card.dueDate || '';
 
-    // Update modal title
-    modalTitle.textContent = 'Edit Card';
+    modalTitle.textContent = 'Edit Task';
     
-    // Show modal
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -252,13 +348,14 @@ async function saveCard() {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error('Failed to save card');
         }
 
-        await fetchCards();
         closeModal();
+        await fetchCards();
     } catch (error) {
-        console.error('Failed to save card:', error);
+        console.error('Error saving card:', error);
+        alert('Failed to save card');
     }
 }
 
@@ -266,6 +363,10 @@ async function deleteCard() {
     const cardId = document.getElementById('cardIdInput').value;
     
     if (!cardId) return;
+    
+    if (!confirm('Delete this task?')) return;
+
+    debugLog(`Deleting card ${cardId}`);
 
     try {
         const response = await fetch(`/api/cards/${cardId}`, {
@@ -274,18 +375,20 @@ async function deleteCard() {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error('Failed to delete card');
         }
 
-        await fetchCards();
         closeModal();
+        await fetchCards();
     } catch (error) {
-        console.error('Failed to delete card:', error);
+        console.error('Error deleting card:', error);
+        alert('Failed to delete card');
     }
 }
 
-async function reloadHeartbeatTasks() {
+async function reloadHeartbeat() {
     debugLog('Reloading heartbeat tasks');
+    
     try {
         const response = await fetch('/api/heartbeat/reload', {
             method: 'POST',
@@ -293,156 +396,39 @@ async function reloadHeartbeatTasks() {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error('Failed to reload heartbeat');
         }
 
         await fetchCards();
-        await processInProgressTasks(); // Immediately move heartbeat tasks to in-progress
     } catch (error) {
-        console.error('Failed to reload Heartbeat tasks:', error);
+        console.error('Error reloading heartbeat:', error);
+        alert('Failed to reload heartbeat');
     }
 }
 
-// Drag and drop functionality
-function setupDragAndDrop() {
-    const columns = document.querySelectorAll('.column-container');
+// Event listeners
+document.getElementById('addCardBtn').addEventListener('click', () => {
+    document.getElementById('cardIdInput').value = '';
+    document.getElementById('cardCurrentColumn').value = 'todo';
+    document.getElementById('cardTitleInput').value = '';
+    document.getElementById('cardDescriptionInput').value = '';
+    document.getElementById('cardPriorityInput').value = 'medium';
+    document.getElementById('cardTagsInput').value = '';
+    document.getElementById('cardDueDateInput').value = '';
+    document.getElementById('modalTitle').textContent = 'Add Task';
     
-    columns.forEach(column => {
-        column.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
+    const modal = document.getElementById('cardModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+});
 
-        column.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            if (!draggedCard) return;
+document.getElementById('saveCardBtn').addEventListener('click', saveCard);
+document.getElementById('deleteCardBtn').addEventListener('click', deleteCard);
+document.getElementById('cancelCardBtn').addEventListener('click', closeModal);
+document.getElementById('reloadHeartbeatBtn').addEventListener('click', reloadHeartbeat);
 
-            const fromColumn = draggedCard.dataset.column;
-            const toColumn = e.currentTarget.querySelector('.card-container').dataset.column;
-            const cardId = draggedCard.dataset.cardId;
-
-            if (fromColumn === toColumn) return;
-
-            try {
-                const response = await fetch(`/api/cards/${cardId}/move`, {
-                    method: 'PUT',
-                    headers: authHeaders(),
-                    body: JSON.stringify({ fromColumn, toColumn })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                // If moved to in-progress, trigger auto-move
-                if (toColumn === 'in-progress') {
-                    await processInProgressTasks();
-                }
-
-                await fetchCards(); // Reload entire board
-            } catch (error) {
-                console.error('Failed to move card:', error);
-            }
-
-            draggedCard = null;
-        });
-    });
-}
-
-// Periodic tasks
-async function processInProgressTasks() {
-    debugLog('Processing in-progress tasks');
-    try {
-        const response = await fetch('/api/cards/process-tasks', {
-            method: 'POST',
-            headers: authHeaders()
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const updatedColumns = await response.json();
-        renderColumns(updatedColumns);
-    } catch (error) {
-        console.error('Error processing tasks:', error);
-    }
-}
-
-// Drag start and end handlers
-function dragStart(e) {
-    draggedCard = e.target;
-    e.target.classList.add('dragging');
-}
-
-function dragEnd(e) {
-    e.target.classList.remove('dragging');
-}
-
-// Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
-    debugLog('DOM content loaded');
-
-    // Initial fetch
+// Initialize
+if (checkAuth()) {
     fetchCards();
-    setupDragAndDrop();
-
-    // Event listeners
-    const addCardBtn = document.getElementById('addCardBtn');
-    const saveCardBtn = document.getElementById('saveCardBtn');
-    const deleteCardBtn = document.getElementById('deleteCardBtn');
-    const cancelCardBtn = document.getElementById('cancelCardBtn');
-    const reloadHeartbeatBtn = document.getElementById('reloadHeartbeatBtn');
-
-    if (addCardBtn) {
-        addCardBtn.addEventListener('click', openAddModal);
-    } else {
-        console.error('Add Card button not found');
-    }
-
-    if (saveCardBtn) {
-        saveCardBtn.addEventListener('click', saveCard);
-    } else {
-        console.error('Save Card button not found');
-    }
-
-    if (deleteCardBtn) {
-        deleteCardBtn.addEventListener('click', deleteCard);
-    } else {
-        console.error('Delete Card button not found');
-    }
-
-    if (cancelCardBtn) {
-        cancelCardBtn.addEventListener('click', closeModal);
-    } else {
-        console.error('Cancel Card button not found');
-    }
-
-    if (reloadHeartbeatBtn) {
-        reloadHeartbeatBtn.addEventListener('click', reloadHeartbeatTasks);
-    } else {
-        console.error('Reload Heartbeat button not found');
-    }
-
-    // ESC key to close modal
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            const modal = document.getElementById('cardModal');
-            if (modal && !modal.classList.contains('hidden')) {
-                closeModal();
-            }
-        }
-    });
-
-    // Periodic updates
     setInterval(fetchCards, 5000);
-    setInterval(processInProgressTasks, 10000);
-});
-// Logout button handler
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    if (confirm('Clear authentication token and logout?')) {
-        localStorage.removeItem('kanban_token');
-        authToken = null;
-        alert('Logged out. Page will reload.');
-        window.location.reload();
-    }
-});
+}
