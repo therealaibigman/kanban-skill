@@ -50,8 +50,16 @@ class AuthMiddleware {
 
     // Middleware function
     authenticate(req, res, next) {
-        // Health check is always allowed (for monitoring)
-        if (req.path === '/health') {
+        // Exempt these paths from auth
+        const exemptPaths = [
+            '/health',
+            '/api/auth/login',
+            '/kanban',
+            '/kanban/',
+        ];
+        
+        // Exempt all static assets under /kanban/
+        if (req.path.startsWith('/kanban/') || exemptPaths.includes(req.path)) {
             return next();
         }
 
