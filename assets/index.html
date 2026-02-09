@@ -100,12 +100,19 @@
         .priority-high { border-left: 4px solid #ef4444; }
         
         .column-container {
-            min-height: 400px;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
             transition: all 0.3s ease;
         }
         
         .column-container:hover {
             transform: translateY(-2px);
+        }
+        
+        .card-container {
+            flex: 1;
+            min-height: 450px;
         }
         
         .login-container {
