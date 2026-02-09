@@ -291,7 +291,6 @@ function createCardElement(card) {
 
     return cardElement;
 }
-}
 
 // Drag and drop setup
 document.querySelectorAll('.card-container').forEach(container => {
