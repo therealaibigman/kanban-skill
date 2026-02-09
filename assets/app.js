@@ -227,12 +227,13 @@ function createCardElement(card) {
     // Reordering: drag over other cards
     cardElement.addEventListener('dragover', (e) => {
         e.preventDefault();
-        e.stopPropagation();
         
         if (!draggedCardElement || draggedCardElement === cardElement) return;
         
-        // Same column - show reorder indicator
+        // Same column - show reorder indicator and stop propagation
         if (card.column === draggedCard.column) {
+            e.stopPropagation(); // Only stop for same-column
+            
             // Clear all previous indicators
             document.querySelectorAll('.card').forEach(c => {
                 c.classList.remove('drag-over-top', 'drag-over-bottom');
@@ -253,6 +254,7 @@ function createCardElement(card) {
             
             draggedOverCard = cardElement;
         }
+        // Different column - let event bubble to column container
     });
 
     cardElement.addEventListener('dragleave', (e) => {
