@@ -521,26 +521,6 @@ async function deleteCard() {
     }
 }
 
-async function reloadHeartbeat() {
-    debugLog('Reloading heartbeat tasks');
-    
-    try {
-        const response = await fetch('/api/heartbeat/reload', {
-            method: 'POST',
-            headers: authHeaders()
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to reload heartbeat');
-        }
-
-        await fetchCards();
-    } catch (error) {
-        console.error('Error reloading heartbeat:', error);
-        alert('Failed to reload heartbeat');
-    }
-}
-
 // Event listeners
 document.getElementById('addCardBtn').addEventListener('click', () => {
     document.getElementById('cardIdInput').value = '';
@@ -566,7 +546,6 @@ document.getElementById('addCardBtn').addEventListener('click', () => {
 document.getElementById('saveCardBtn').addEventListener('click', saveCard);
 document.getElementById('deleteCardBtn').addEventListener('click', deleteCard);
 document.getElementById('cancelCardBtn').addEventListener('click', closeModal);
-document.getElementById('reloadHeartbeatBtn').addEventListener('click', reloadHeartbeat);
 
 // Initialize
 if (checkAuth()) {
