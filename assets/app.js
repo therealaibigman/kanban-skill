@@ -328,29 +328,40 @@ function createCardElement(card) {
     return cardElement;
 }
 
-// Drag and drop setup
-document.querySelectorAll('.card-container').forEach(container => {
-    container.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        container.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-    });
+// Drag and drop setup - MUST run after DOM is ready
+function setupColumnDropZones() {
+    document.querySelectorAll('.card-container').forEach(container => {
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        });
 
-    container.addEventListener('dragleave', () => {
-        container.style.backgroundColor = '';
-    });
+        container.addEventListener('dragleave', () => {
+            container.style.backgroundColor = '';
+        });
 
-    container.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        container.style.backgroundColor = '';
-        
-        if (!draggedCard) return;
+        container.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            container.style.backgroundColor = '';
+            
+            debugLog('Drop event on column container', container.dataset.column);
+            
+            if (!draggedCard) {
+                debugLog('No draggedCard - drop ignored');
+                return;
+            }
 
-        const toColumn = container.dataset.column;
-        const fromColumn = draggedCard.column;
+            const toColumn = container.dataset.column;
+            const fromColumn = draggedCard.column;
 
-        if (fromColumn === toColumn) return;
+            debugLog(`Column drop: from ${fromColumn} to ${toColumn}`);
 
-        debugLog(`Moving card ${draggedCard.id} from ${fromColumn} to ${toColumn}`);
+            if (fromColumn === toColumn) {
+                debugLog('Same column - ignoring (reorder handles this)');
+                return;
+            }
+
+            debugLog(`Moving card ${draggedCard.id} from ${fromColumn} to ${toColumn}`);
 
         try {
             const response = await fetch(`/api/cards/${draggedCard.id}/move`, {
@@ -369,7 +380,8 @@ document.querySelectorAll('.card-container').forEach(container => {
             alert('Failed to move card');
         }
     });
-});
+    });
+}
 
 async function fetchCards() {
     debugLog('Fetching cards...');
@@ -553,6 +565,7 @@ document.getElementById('cancelCardBtn').addEventListener('click', closeModal);
 
 // Initialize
 if (checkAuth()) {
+    setupColumnDropZones(); // Set up drag-drop handlers
     fetchCards();
     setInterval(fetchCards, 5000);
 }
