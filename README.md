@@ -67,9 +67,10 @@ export KANBAN_PASSWORD="your-secure-password"
 
 **Local:**
 - http://127.0.0.1:18790/kanban
+- http://localhost:18790/kanban
 
-**Via NGINX (recommended):**
-- https://able-harp.exe.xyz/kanban
+**Via NGINX (production):**
+- https://your-domain.com/kanban (configure NGINX as shown below)
 
 **Login Options:**
 1. **Password Login** (easiest) - Enter the password from your config

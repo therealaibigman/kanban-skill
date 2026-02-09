@@ -51,7 +51,7 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18790/api/cards
 ```
 
 **Access the UI:**
-- First visit: `https://able-harp.exe.xyz/kanban?token=YOUR_TOKEN`
+- First visit: `https://your-domain.com/kanban?token=YOUR_TOKEN`
 - Token is saved to localStorage for subsequent visits
 
 ## Using the Web UI
