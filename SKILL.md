@@ -17,7 +17,16 @@ A visual kanban board for managing tasks with automatic HEARTBEAT.md synchroniza
 
 ## Starting the Server
 
-The kanban server must be running to use this skill:
+The kanban server runs as a systemd service (production) or can be started manually (development).
+
+### Production (recommended)
+
+```bash
+sudo systemctl start kanban.service
+# Server is now running and will auto-restart on boot
+```
+
+### Development
 
 ```bash
 cd ~/.openclaw/workspace/skills/kanban
@@ -25,6 +34,25 @@ node scripts/server.js &
 ```
 
 The server runs on port 18790 by default. Set `KANBAN_PORT` environment variable to change.
+
+## Authentication
+
+All API endpoints (except `/health`) require the OpenClaw gateway token.
+
+**Get the token:**
+```bash
+cat ~/.openclaw/openclaw.json | jq -r '.gateway.auth.token'
+```
+
+**Use in API calls:**
+```bash
+TOKEN="your-token-here"
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18790/api/cards
+```
+
+**Access the UI:**
+- First visit: `https://able-harp.exe.xyz/kanban?token=YOUR_TOKEN`
+- Token is saved to localStorage for subsequent visits
 
 ## Using the Web UI
 
