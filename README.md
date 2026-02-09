@@ -5,24 +5,56 @@
 ![Kanban Board Screenshot](./screenshot.png)
 *Screenshot: The Big Man's Kanban Board in action*
 
-## What Is This?
+A production-ready kanban board skill for OpenClaw featuring a modern glassmorphism UI, password authentication, automatic task execution, archive system, and intelligent scheduling.
 
-An OpenClaw skill that provides a visual kanban board with HEARTBEAT.md integration, auto-execution, and secure authentication for managing tasks.
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Authentication](#authentication)
+- [Using the Kanban Board](#using-the-kanban-board)
+- [Task Scheduling](#task-scheduling)
+- [Auto-Execution](#auto-execution)
+- [Archive System](#archive-system)
+- [API Reference](#api-reference)
+- [Production Deployment](#production-deployment)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+
+---
 
 ## Features
 
+### Core Functionality
 - 🎯 **Modern Dashboard UI** - Beautiful glassmorphism design with gradient themes
 - 🔐 **Password Login** - Easy authentication with password → token exchange
 - 🎨 **Visual Kanban Board** - Drag-and-drop with smooth animations
+- 📋 **Card Reordering** - Drag cards up/down within columns to prioritize
 - 📊 **Live Stats** - Real-time task counts for each column
-- 🔄 **HEARTBEAT.md Sync** - Bi-directional sync with your heartbeat checklist
-- ⚡ **Auto-Execution** - Tasks moved to "In Progress" trigger instant execution by OpenClaw
-- 🔒 **Secure Authentication** - Token-based auth with password option
-- 💬 **Conversational Interface** - Manage tasks through natural language
-- 🏷️ **Rich Tasks** - Title, description, priority, tags, due dates
-- 🚀 **REST API** - Full programmatic control
-- 🔧 **Systemd Service** - Production-ready deployment
+- ⚡ **Auto-Execution** - Tasks moved to "In Progress" trigger instant OpenClaw execution
+- 📦 **Archive System** - Archive completed tasks, restore if needed, permanent delete
+- 🔒 **Secure Authentication** - Token-based auth integrated with OpenClaw gateway
+
+### Task Management
+- 🏷️ **Rich Tasks** - Title, description, priority (low/medium/high), tags, due dates
+- 📅 **Three Schedule Types**:
+  - **Once** - One-time task
+  - **Heartbeat** 💓 - Recurring (for tracked recurring work)
+  - **Cron** ⏰ - Scheduled with cron expression (creates OpenClaw cron job)
+- 🚀 **Four Columns** - Backlog, To Do, In Progress, Done
+- 💬 **Conversational Interface** - Manage tasks through natural language with The Big Man
+
+### Technical Features
+- 🔧 **Systemd Service** - Production-ready deployment with auto-restart
 - 🌐 **NGINX Integration** - Secure HTTPS access
+- 🔑 **Multiple Auth Methods** - Authorization header or cookie
+- 📡 **REST API** - Full programmatic control
+- 💾 **Persistent Storage** - JSON file-based with separate archive
+
+---
 
 ## Quick Start
 
@@ -33,25 +65,12 @@ cd ~/.openclaw/workspace/skills/kanban
 npm install
 ```
 
-### 2. Start the Server
-
-#### Development (manual)
-```bash
-node scripts/server.js &
-```
-
-#### Production (systemd)
-```bash
-sudo systemctl start kanban.service
-sudo systemctl enable kanban.service  # Auto-start on boot
-```
-
-### 3. Configure Password (Optional but Recommended)
+### 2. Configure Password
 
 Add a password to your OpenClaw config for easy login:
 
 ```bash
-# Edit config
+# Edit OpenClaw config
 nano ~/.openclaw/openclaw.json
 
 # Add under gateway.auth:
@@ -63,6 +82,20 @@ Or set via environment variable:
 export KANBAN_PASSWORD="your-secure-password"
 ```
 
+### 3. Start the Server
+
+#### Production (systemd - recommended)
+```bash
+sudo systemctl start kanban.service
+sudo systemctl enable kanban.service  # Auto-start on boot
+```
+
+#### Development (manual)
+```bash
+cd ~/.openclaw/workspace/skills/kanban
+node scripts/server.js &
+```
+
 ### 4. Access the Web UI
 
 **Local:**
@@ -72,250 +105,578 @@ export KANBAN_PASSWORD="your-secure-password"
 **Via NGINX (production):**
 - https://your-domain.com/kanban (configure NGINX as shown below)
 
-**Login Options:**
-1. **Password Login** (easiest) - Enter the password from your config
-2. **Token Login** - The password login returns your token automatically
+### 5. Login
 
-**On first visit:**
-- Modern login screen with password prompt
-- Password authentication returns your token
-- Token stored securely in browser localStorage
-- Use the "🔓 Logout" button to clear it
+- Enter your configured password
+- Token is automatically retrieved and stored in browser localStorage
+- Use "🔓 Logout" button to clear token and login again
 
-### 4. Load Tasks from HEARTBEAT.md
+---
 
-Click "Reload Heartbeat" in the UI, or:
+## Authentication
 
-```bash
-TOKEN="your-openclaw-gateway-token"
-curl -X POST http://127.0.0.1:18790/api/heartbeat/reload \
-  -H "Authorization: Bearer $TOKEN"
-```
+### Security Model
 
-## 🔒 Security
+The kanban server uses **OpenClaw's gateway token** for authentication. All API endpoints (except `/health` and `/api/auth/login`) require a valid token.
 
-### Authentication
+### Password Login Flow
 
-The kanban server uses OpenClaw's gateway token for authentication. All API endpoints (except `/health`) require a valid token.
+1. User enters password in login form
+2. Server validates against `gateway.auth.password` in OpenClaw config
+3. Server returns the OpenClaw gateway token
+4. Token stored in browser localStorage
+5. All subsequent API calls use: `Authorization: Bearer <token>`
+
+### Token Validation
 
 **Token can be provided via:**
 1. `Authorization: Bearer <token>` header (API calls)
-2. `openclaw_token` cookie (browser)
+2. `openclaw_token` cookie (browser sessions)
 
-The token is loaded from `~/.openclaw/openclaw.json` at startup.
+**Security features:**
+- ✅ Passwords never stored in browser
+- ✅ Tokens never exposed in URLs
+- ✅ Server binds to localhost only (127.0.0.1)
+- ✅ NGINX provides HTTPS termination
+- ✅ CORS configured for credentials only
 
 ### Access Control
 
-- ✅ **Authenticated requests** - Full access to all endpoints
-- ❌ **Unauthenticated requests** - Rejected with 401 or 403
-- ✅ **Health check** - Always accessible (for monitoring)
-- 🔒 **No URL tokens** - Tokens never passed in URLs (security best practice)
+| Endpoint | Auth Required | Purpose |
+|----------|---------------|---------|
+| `/health` | No | Monitoring |
+| `/api/auth/login` | No | Password → token exchange |
+| `/kanban/*` (static) | No | UI files |
+| All API endpoints | Yes | Data operations |
 
-### Network Security
+---
 
-- Server binds to `127.0.0.1` (localhost only)
-- NGINX proxy provides HTTPS termination
-- CORS configured for credential support
+## Using the Kanban Board
 
-## Using the Skill
+### Web UI
 
-### Via Web UI
+#### Dashboard Overview
 
-- **Drag and drop** cards between columns
-- **Click a card** to edit details
-- **Add new tasks** with the "+ Add Card" button
-- **Reload heartbeat** to import new checklist items
-- **Auto-execute** by dragging to "In Progress"
+**Header:**
+- Stats cards showing task counts per column
+- Action buttons: Add Task, Archive, Logout
+
+**Kanban Board:**
+- Four columns: Backlog, To Do, In Progress, Done
+- Drag-and-drop cards between columns
+- Drag cards up/down within columns to reorder
+- Click any card to edit
+
+#### Creating Tasks
+
+1. Click **"+ Add Task"** button
+2. Fill in task details:
+   - **Title** (required)
+   - **Description** (optional)
+   - **Priority**: Low, Medium, High
+   - **Due Date** (optional)
+   - **Schedule Type**: Once, Heartbeat, Cron
+   - **Starting Column**: Backlog, To Do, In Progress, Done
+   - **Tags** (comma-separated)
+   - **Cron Expression** (if schedule type is Cron)
+3. Click **"Save"**
+
+#### Editing Tasks
+
+1. Click any card
+2. Edit any field
+3. Options:
+   - **Save** - Update task
+   - **📦 Archive** - Move to archive (cancels cron if exists)
+   - **Delete** - Permanently delete task
+   - **Cancel** - Close without saving
+
+#### Moving Tasks
+
+**Between Columns:**
+- Drag card to different column
+- Auto-execution triggers if moved to "In Progress"
+
+**Within Column (Reordering):**
+- Drag card up or down within same column
+- Bright gradient line shows drop position
+- Position above or below target card
+
+#### Archive Management
+
+1. Click **"📦 Archive"** button
+2. View all archived tasks with dates
+3. Options:
+   - **↩️ Restore** - Move back to Done column
+   - **🗑️ Delete** - Permanently delete (cannot be undone)
+   - **Archive All Done** - Batch archive all tasks in Done column
+   - **Clear Archive** - Delete all archived tasks
 
 ### Via Conversation with The Big Man
+
+The Big Man can manage tasks through natural language:
 
 **View tasks:**
 ```
 "What's on my kanban board?"
 "Show me my backlog"
 "What tasks are in progress?"
+"How many tasks do I have?"
 ```
 
 **Add tasks:**
 ```
 "Add a task: Review MoltHub posts"
 "Create high priority task: Fix sync bug"
+"Add cron task to check updates daily at 9 AM"
 ```
 
 **Move tasks:**
 ```
 "Move 'Review posts' to in progress"
 "Mark 'Fix bug' as done"
+"Start working on [task name]"
 ```
 
-**Sync with HEARTBEAT:**
+**Archive tasks:**
 ```
-"Sync my tasks to heartbeat"
-"Load tasks from heartbeat"
+"Archive all done tasks"
+"Clean up my done column"
 ```
+
+The Big Man reads `~/.openclaw/kanban-board.json` to answer questions and uses the API to make changes.
 
 ### Via API
 
-All API calls require authentication. Set the token:
+All API calls require authentication:
 
 ```bash
-export KANBAN_TOKEN="your-openclaw-gateway-token"
+export TOKEN="your-openclaw-gateway-token"
 ```
 
 **Get all tasks:**
 ```bash
-curl http://127.0.0.1:18790/api/cards \
-  -H "Authorization: Bearer $KANBAN_TOKEN"
+curl http://localhost:18790/api/cards \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Add a task:**
 ```bash
-curl -X POST http://127.0.0.1:18790/api/cards \
-  -H "Authorization: Bearer $KANBAN_TOKEN" \
+curl -X POST http://localhost:18790/api/cards \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Task name",
     "description": "Details",
     "priority": "high",
-    "tags": ["tag1"]
+    "tags": ["tag1", "tag2"],
+    "column": "backlog",
+    "schedule": "once"
   }'
 ```
 
 **Move a task:**
 ```bash
-curl -X PUT http://127.0.0.1:18790/api/cards/{id}/move \
-  -H "Authorization: Bearer $KANBAN_TOKEN" \
+curl -X PUT http://localhost:18790/api/cards/{id}/move \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"fromColumn": "todo", "toColumn": "in-progress"}'
 ```
 
-**Sync to HEARTBEAT.md:**
+**Reorder within column:**
 ```bash
-curl -X POST http://127.0.0.1:18790/api/heartbeat/sync \
-  -H "Authorization: Bearer $KANBAN_TOKEN"
+curl -X PUT http://localhost:18790/api/cards/{id}/reorder \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"column": "backlog", "position": 0}'
 ```
 
-## ⚡ Auto-Execution Feature
+**Archive task:**
+```bash
+curl -X POST http://localhost:18790/api/archive/{id} \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Task Scheduling
+
+### Three Schedule Types
+
+#### 1. Once (Default) 🎯
+
+**Purpose:** Standard one-time task
+
+**Behavior:**
+- Appears in kanban board
+- Moves through columns manually
+- Completes when moved to Done or archived
+- No recurrence
+
+**Use for:**
+- Features to build
+- Bugs to fix
+- One-off work items
+
+#### 2. Heartbeat 💓
+
+**Purpose:** Recurring task you want to track visually
+
+**Behavior:**
+- Appears in kanban with 💓 icon
+- Can be moved through columns
+- Tagged with "heartbeat"
+- If archived, recurrence stops (converts to "once")
+
+**Use for:**
+- Regular reviews
+- Periodic maintenance
+- Recurring work you want to see in kanban
+
+**Note:** Different from HEARTBEAT.md automatic actions
+
+#### 3. Cron ⏰
+
+**Purpose:** Scheduled task with specific timing
+
+**Behavior:**
+- Creates OpenClaw cron job automatically
+- Appears in kanban with ⏰ icon and cron expression
+- Fires system event to main session at scheduled time
+- Visible in OpenClaw Control UI → Cron Jobs panel
+- If archived, cron job is cancelled
+
+**Cron Expression Examples:**
+- `0 9 * * *` - Daily at 9 AM UTC
+- `0 9 * * 1-5` - Weekdays at 9 AM
+- `0 */6 * * *` - Every 6 hours
+- `*/30 * * * *` - Every 30 minutes
+- `0 10 * * 1` - Weekly Monday at 10 AM
+
+**Use for:**
+- Daily standup reminders
+- Weekly reviews
+- Periodic checks
+- Scheduled maintenance
+
+**How it executes:**
+```
+🚧 Scheduled task from Kanban:
+
+**Task Title**
+Description
+
+Priority: high
+Schedule: 0 9 * * *
+```
+
+---
+
+## Auto-Execution
 
 ### How It Works
 
-When a task is moved to the **"In Progress"** column, the kanban server automatically:
+When a task is moved to the **"In Progress"** column (via UI or API), the kanban server automatically:
 
 1. Detects the column change
-2. Builds an execution message from the task details
-3. Sends a wake event to OpenClaw's main session
-4. The Big Man receives the task and executes it immediately
+2. Builds an execution message from task details
+3. Sends wake event to OpenClaw main session
+4. The Big Man receives it instantly and executes the task
 
 ### Example Flow
 
 **You drag:** "Review MoltHub posts" from To Do → In Progress
 
-**Server sends to OpenClaw:**
+**Server instantly sends:**
 ```
 🚧 Auto-executing from Kanban:
 
 **Task:** Review MoltHub posts
-**Details:** From Hourly Checks
-**Tags:** heartbeat, hourly-checks
+**Details:** Check recent posts and engage
+**Tags:** community, engagement
 
 Review MoltHub posts
 ```
 
-**The Big Man receives this and executes the task instantly.**
+**The Big Man receives this and executes immediately.**
 
 ### Execution Monitoring
 
 **View execution log:**
 ```bash
-curl http://127.0.0.1:18790/api/executions/log \
-  -H "Authorization: Bearer $KANBAN_TOKEN"
+curl http://localhost:18790/api/executions/log \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-**Check pending queue:**
-```bash
-curl http://127.0.0.1:18790/api/executions/queue \
-  -H "Authorization: Bearer $KANBAN_TOKEN"
+**Log format:**
+```
+[2026-02-09T22:30:00.000Z] Executing task: Review MoltHub posts (abc-123)
+[2026-02-09T22:30:00.123Z] ✅ Injected: Review MoltHub posts
 ```
 
-## HEARTBEAT.md Integration
+### Queue Fallback
 
-### How It Works
+If the wake API fails, tasks are queued in `kanban-task-queue.json`. The queue is automatically checked and cleared during heartbeats. This rarely happens - auto-execution typically works instantly.
 
-1. **Import**: Unchecked items (`- [ ]`) from HEARTBEAT.md load into "To Do" column
-2. **Track**: Move tasks through columns as you work on them
-3. **Sync**: Completed tasks (in "Done" column) check off in HEARTBEAT.md (`- [x]`)
+---
 
-### Example Workflow
+## Archive System
 
-**HEARTBEAT.md:**
-```markdown
-## Daily Checks
-- [ ] Check OpenClaw updates
-- [ ] Review MoltHub posts
+### Purpose
 
-## Hourly Checks
-- [ ] Update MEMORY.md
+Keep your Done column tidy by archiving completed tasks while preserving history.
+
+### Features
+
+#### Archive Tasks
+- **Individual:** Click task → Edit → "📦 Archive" button
+- **Batch:** Archive modal → "Archive All Done" button
+- **From any column:** Can archive tasks without moving to Done first
+
+#### View Archive
+- Click "📦 Archive" button in header
+- See all archived tasks with:
+  - Title, description, priority, tags
+  - Archived date timestamp
+  - Original schedule type
+
+#### Restore Tasks
+- Click "↩️ Restore" on any archived task
+- Task moves back to Done column
+- Ready to continue or move to other columns
+
+#### Permanent Delete
+- Click "🗑️ Delete" on archived task
+- Confirmation required
+- Cannot be undone
+- Removes from archive file permanently
+
+#### Clear Archive
+- "Clear Archive" button in archive modal
+- Deletes all archived tasks
+- Confirmation required
+- Use to clean up old history
+
+### Cron & Heartbeat Handling
+
+**When archiving:**
+- **Cron tasks**: OpenClaw cron job is automatically cancelled
+- **Heartbeat tasks**: Schedule changed to "once" (stops recurrence)
+- **Once tasks**: No special handling needed
+
+### Storage
+
+- **Archive file:** `~/.openclaw/kanban-archive.json`
+- **Separate from active board:** `~/.openclaw/kanban-board.json`
+- **Preserved history:** Tasks remain until permanently deleted
+
+---
+
+## API Reference
+
+All endpoints require authentication except where noted.
+
+### Authentication
+
+#### POST `/api/auth/login`
+**Auth:** Not required  
+**Purpose:** Login with password, receive token
+
+**Request:**
+```json
+{
+  "password": "your-password"
+}
 ```
 
-**After reload:**
-- All 3 tasks appear in kanban "To Do" column
-- Tagged with "heartbeat" and section name
+**Response:**
+```json
+{
+  "success": true,
+  "token": "e8119c20a9e704bc26cb5b432aa6bb4596083537c139e5d0",
+  "message": "Login successful"
+}
+```
 
-**After completing "Check OpenClaw updates":**
-- Move task to "Done" column
-- Run sync
-- HEARTBEAT.md updates to `- [x] Check OpenClaw updates`
+### Tasks (Cards)
 
-## File Locations
+#### GET `/api/cards`
+**Purpose:** List all tasks organized by column
 
-- **Kanban data**: `~/.openclaw/kanban-board.json`
-- **Execution log**: `~/.openclaw/workspace/kanban-executions.log`
-- **Task queue**: `~/.openclaw/workspace/kanban-task-queue.json` (fallback)
-- **HEARTBEAT**: `~/.openclaw/workspace/HEARTBEAT.md`
-- **Skill**: `~/.openclaw/workspace/skills/kanban/`
-- **Config**: `~/.openclaw/openclaw.json` (for auth token)
+**Response:**
+```json
+{
+  "backlog": [...],
+  "todo": [...],
+  "in-progress": [...],
+  "done": [...]
+}
+```
 
-## API Endpoints
+#### POST `/api/cards`
+**Purpose:** Create new task (defaults to backlog)
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/health` | No | Health check |
-| POST | `/api/auth/login` | No | Password login (returns token) |
-| GET | `/api/cards` | Yes | List all cards |
-| POST | `/api/cards` | Yes | Create card |
-| PUT | `/api/cards/:id` | Yes | Update card |
-| DELETE | `/api/cards/:id` | Yes | Delete card |
-| PUT | `/api/cards/:id/move` | Yes | Move between columns |
-| POST | `/api/heartbeat/reload` | Yes | Import from HEARTBEAT.md |
-| POST | `/api/heartbeat/sync` | Yes | Sync to HEARTBEAT.md |
-| POST | `/api/cards/auto-move` | Yes | Move all To Do → In Progress |
-| POST | `/api/cards/process-tasks` | Yes | Move all In Progress → Done |
-| GET | `/api/executions/log` | Yes | View execution history |
-| GET | `/api/executions/queue` | Yes | Check pending tasks |
-| DELETE | `/api/executions/queue` | Yes | Clear task queue |
+**Request:**
+```json
+{
+  "title": "Task title",
+  "description": "Optional description",
+  "priority": "low|medium|high",
+  "tags": ["tag1", "tag2"],
+  "dueDate": "2026-02-15",
+  "column": "backlog",
+  "schedule": "once|heartbeat|cron",
+  "cronExpression": "0 9 * * *"
+}
+```
+
+**Response:** Created task object with ID
+
+#### PUT `/api/cards/:id`
+**Purpose:** Update task details
+
+**Request:** Same as POST (partial updates supported)
+
+#### DELETE `/api/cards/:id`
+**Purpose:** Delete task (cancels cron job if exists)
+
+#### PUT `/api/cards/:id/move`
+**Purpose:** Move task between columns (triggers auto-execution if moved to in-progress)
+
+**Request:**
+```json
+{
+  "fromColumn": "todo",
+  "toColumn": "in-progress"
+}
+```
+
+#### PUT `/api/cards/:id/reorder`
+**Purpose:** Reorder task within same column
+
+**Request:**
+```json
+{
+  "column": "backlog",
+  "position": 2
+}
+```
+
+Position 0 = top of column.
+
+### Archive
+
+#### POST `/api/archive/:id`
+**Purpose:** Archive a task (from any column)
+
+**Request (optional):**
+```json
+{
+  "fromColumn": "done"
+}
+```
+
+Cancels cron job if exists, disables heartbeat recurrence.
+
+#### POST `/api/archive/all`
+**Purpose:** Archive all tasks in Done column
+
+Cancels all associated cron jobs.
+
+#### GET `/api/archive`
+**Purpose:** List archived tasks
+
+**Query params:**
+- `limit` - Max tasks to return (default: 100)
+
+#### POST `/api/archive/:id/restore`
+**Purpose:** Restore archived task to Done column
+
+#### DELETE `/api/archive/:id`
+**Purpose:** Permanently delete archived task
+
+#### DELETE `/api/archive`
+**Purpose:** Clear entire archive (all tasks permanently deleted)
+
+### Execution Monitoring
+
+#### GET `/api/executions/log`
+**Purpose:** View auto-execution history
+
+Returns plain text log:
+```
+[2026-02-09T22:30:00.000Z] Executing task: Review posts (abc-123)
+[2026-02-09T22:30:00.123Z] ✅ Injected: Review posts
+```
+
+#### GET `/api/executions/queue`
+**Purpose:** Check pending tasks (fallback queue)
+
+Usually empty - tasks execute instantly.
+
+#### DELETE `/api/executions/queue`
+**Purpose:** Clear task queue after processing
+
+### Health Check
+
+#### GET `/health`
+**Auth:** Not required  
+**Purpose:** Service health check
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "service": "kanban"
+}
+```
+
+---
 
 ## Production Deployment
 
 ### Systemd Service
 
+The kanban server runs as a systemd service for reliability.
+
 **Service file:** `/etc/systemd/system/kanban.service`
 
 **Commands:**
 ```bash
-sudo systemctl start kanban      # Start
-sudo systemctl stop kanban       # Stop
-sudo systemctl restart kanban    # Restart
-sudo systemctl status kanban     # Status
+sudo systemctl start kanban      # Start server
+sudo systemctl stop kanban       # Stop server
+sudo systemctl restart kanban    # Restart server
+sudo systemctl status kanban     # Check status
 sudo systemctl enable kanban     # Auto-start on boot
-sudo journalctl -u kanban -f     # View logs
+sudo journalctl -u kanban -f     # View live logs
+```
+
+**Service configuration:**
+```ini
+[Unit]
+Description=The Big Man's Kanban Board Server
+After=network.target
+
+[Service]
+Type=simple
+User=exedev
+WorkingDirectory=/home/exedev/.openclaw/workspace/skills/kanban
+ExecStart=/usr/bin/node /home/exedev/.openclaw/workspace/skills/kanban/scripts/server.js
+Restart=always
+RestartSec=10
+Environment="NODE_ENV=production"
+Environment="KANBAN_PORT=18790"
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ### NGINX Configuration
 
-**Add to your NGINX config:**
+Add to your NGINX server block:
 
 ```nginx
-# Kanban board
+# Kanban static assets and UI
 location /kanban {
     proxy_pass http://127.0.0.1:18790;
     proxy_http_version 1.1;
@@ -325,7 +686,7 @@ location /kanban {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
-# Kanban API
+# Kanban API endpoints
 location /api/ {
     proxy_pass http://127.0.0.1:18790;
     proxy_http_version 1.1;
@@ -336,14 +697,102 @@ location /api/ {
 }
 ```
 
-Then: `sudo nginx -t && sudo systemctl reload nginx`
+**Apply changes:**
+```bash
+sudo nginx -t              # Test config
+sudo systemctl reload nginx # Apply
+```
+
+---
+
+## Architecture
+
+### File Structure
+
+```
+~/.openclaw/workspace/skills/kanban/
+├── SKILL.md                    # OpenClaw skill metadata & instructions
+├── README.md                   # This file
+├── package.json                # Node.js dependencies
+├── scripts/
+│   ├── server.js              # Express API server (main entry point)
+│   ├── auth-middleware.js     # Token authentication
+│   ├── task-executor.js       # Auto-execution logic
+│   ├── suggest-improvements.sh # Auto-improvement cron script
+│   └── models/
+│       └── board.js           # Kanban logic, archive, CRUD
+└── assets/
+    ├── index.html             # Modern UI (glassmorphism)
+    └── app.js                 # Frontend JavaScript
+
+Data files:
+~/.openclaw/kanban-board.json       # Active tasks
+~/.openclaw/kanban-archive.json     # Archived tasks
+~/.openclaw/workspace/kanban-executions.log  # Execution log
+```
+
+### Tech Stack
+
+**Backend:**
+- **Runtime:** Node.js v22+
+- **Framework:** Express.js
+- **Storage:** fs-extra (JSON files)
+- **Process:** systemd service
+- **Port:** 18790 (configurable)
+
+**Frontend:**
+- **UI:** Vanilla JavaScript (no framework)
+- **Styling:** Tailwind CSS (CDN)
+- **Design:** Glassmorphism with gradient theme
+- **Features:** Drag-and-drop, animations, responsive
+
+**Integration:**
+- **Auth:** OpenClaw gateway token
+- **Execution:** OpenClaw cron wake API
+- **Cron:** OpenClaw CLI (`openclaw cron`)
+
+### Data Models
+
+**Task Object:**
+```json
+{
+  "id": "uuid-v4",
+  "title": "string",
+  "description": "string",
+  "priority": "low|medium|high",
+  "tags": ["string"],
+  "column": "backlog|todo|in-progress|done",
+  "schedule": "once|heartbeat|cron",
+  "cronExpression": "string|null",
+  "cronJobId": "string|null",
+  "dueDate": "YYYY-MM-DD|null",
+  "createdAt": "ISO8601",
+  "updatedAt": "ISO8601"
+}
+```
+
+**Archived Task:** Same as Task + `archivedAt` timestamp
+
+### Network Security
+
+- Server binds to `127.0.0.1` (localhost only)
+- Not accessible from network directly
+- NGINX proxies with HTTPS termination
+- CORS configured for credentials (`origin: true, credentials: true`)
+- No tokens in URLs (header/cookie only)
+
+---
 
 ## Configuration
 
-### Change Port
+### Port
 
+**Default:** 18790
+
+**Change port:**
+
+Via systemd:
 ```bash
-# In systemd service
 sudo systemctl edit kanban
 
 # Add:
@@ -354,20 +803,148 @@ sudo systemctl daemon-reload
 sudo systemctl restart kanban
 ```
 
-### Get Your OpenClaw Token
+Via command line:
+```bash
+KANBAN_PORT=8080 node scripts/server.js
+```
+
+### Password
+
+**Method 1: OpenClaw Config (recommended)**
+```bash
+nano ~/.openclaw/openclaw.json
+
+# Add under gateway.auth:
+"password": "your-secure-password"
+```
+
+**Method 2: Environment Variable**
+```bash
+export KANBAN_PASSWORD="your-secure-password"
+```
+
+Server checks config first, then falls back to environment variable.
+
+### Get Your Token
+
+If you need the raw token for API calls:
 
 ```bash
 cat ~/.openclaw/openclaw.json | jq -r '.gateway.auth.token'
 ```
 
-## Tech Stack
+---
 
-- **Backend**: Express.js, Node.js
-- **Frontend**: Vanilla JavaScript, Tailwind CSS
-- **Storage**: JSON file (`fs-extra`)
-- **Auth**: Token-based (shared with OpenClaw)
-- **IDs**: UUID v4
-- **Deployment**: systemd, NGINX
+## Troubleshooting
+
+### "Authentication required" error
+
+**Symptom:** API calls return 401
+
+**Solution:**
+- Make sure you're providing the token
+- UI: Login with password
+- API: Add `Authorization: Bearer <token>` header
+- Check token is correct: `cat ~/.openclaw/openclaw.json | jq -r '.gateway.auth.token'`
+
+### Server not starting
+
+**Check status:**
+```bash
+sudo systemctl status kanban
+```
+
+**View logs:**
+```bash
+sudo journalctl -u kanban -n 50 --no-pager
+```
+
+**Common issues:**
+- Port 18790 already in use (change `KANBAN_PORT`)
+- Missing dependencies (`npm install` in skill directory)
+- Permission issues (check file ownership)
+
+### Can't access via NGINX
+
+**Test NGINX config:**
+```bash
+sudo nginx -t
+```
+
+**Check NGINX status:**
+```bash
+sudo systemctl status nginx
+```
+
+**View NGINX logs:**
+```bash
+sudo tail -f /var/log/nginx/error.log
+```
+
+### Auto-execution not working
+
+**Check execution log:**
+```bash
+curl http://localhost:18790/api/executions/log \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Verify server is running:**
+```bash
+sudo systemctl status kanban
+```
+
+**Test manually:**
+1. Move task to "In Progress" via API
+2. Check logs: `sudo journalctl -u kanban -n 20`
+3. Look for: `[Auto-Execute] Task moved to in-progress`
+
+### Cron jobs not appearing
+
+**List OpenClaw cron jobs:**
+```bash
+openclaw cron list --json | jq '.jobs[] | select(.name | startswith("Kanban:"))'
+```
+
+**Check task has cronJobId:**
+```bash
+curl http://localhost:18790/api/cards -H "Authorization: Bearer $TOKEN" \
+  | jq '[.backlog[], .todo[], .["in-progress"][], .done[]] | map(select(.schedule == "cron"))'
+```
+
+**If cronJobId is null:**
+- Cron job creation failed
+- Check server logs: `sudo journalctl -u kanban -n 50`
+- Verify cron expression syntax
+
+### Cards not reordering
+
+**Symptoms:**
+- Drag appears to work but order doesn't change
+- No visual indicator appears
+
+**Solutions:**
+1. Hard refresh browser (Ctrl+Shift+R)
+2. Clear localStorage: `localStorage.clear()`
+3. Check browser console for errors
+4. Verify JavaScript loaded: View source, check `/kanban/app.js`
+
+---
+
+## File Locations
+
+| File | Purpose |
+|------|---------|
+| `~/.openclaw/workspace/skills/kanban/` | Skill directory |
+| `~/.openclaw/kanban-board.json` | Active tasks (board state) |
+| `~/.openclaw/kanban-archive.json` | Archived tasks |
+| `~/.openclaw/workspace/kanban-executions.log` | Auto-execution history |
+| `~/.openclaw/workspace/kanban-task-queue.json` | Fallback queue (rarely used) |
+| `~/.openclaw/workspace/HEARTBEAT.md` | Automatic heartbeat behaviors |
+| `~/.openclaw/openclaw.json` | OpenClaw config (auth token/password) |
+| `/etc/systemd/system/kanban.service` | Systemd service definition |
+
+---
 
 ## Development
 
@@ -378,54 +955,150 @@ cd ~/.openclaw/workspace/skills/kanban
 node scripts/server.js
 ```
 
+Server outputs:
+```
+[Auth] Loaded gateway token from config
+[Auth] Password login enabled
+🏴 The Big Man's Kanban Server running on http://127.0.0.1:18790/kanban
+```
+
 ### Watch Logs
 
 ```bash
+# Systemd logs
 sudo journalctl -u kanban -f
+
+# Or if running manually, stdout shows logs
 ```
 
-### Test Auth
+### Test Authentication
 
 ```bash
+TOKEN="your-token"
+
 # Should fail (no token)
-curl http://127.0.0.1:18790/api/cards
+curl http://localhost:18790/api/cards
+# Returns: {"error":"Authentication required"}
 
 # Should succeed
-TOKEN="your-token"
-curl http://127.0.0.1:18790/api/cards \
+curl http://localhost:18790/api/cards \
   -H "Authorization: Bearer $TOKEN"
+# Returns: {columns...}
 ```
 
-## Troubleshooting
+### Making Changes
 
-### "Authentication required" error
+1. Edit code in `scripts/` or `assets/`
+2. Restart server: `sudo systemctl restart kanban`
+3. Hard refresh browser (Ctrl+Shift+R)
+4. Test changes
+5. Commit: `git add -A && git commit -m "Description" && git push`
 
-Make sure you're providing the OpenClaw gateway token:
-- In the UI: Add `?token=YOUR_TOKEN` to the URL on first visit
-- In API calls: Add `Authorization: Bearer YOUR_TOKEN` header
+---
 
-### Server not starting
+## Integration with OpenClaw
+
+### Cron Jobs
+
+Kanban automatically integrates with OpenClaw's cron system:
+
+**Creating cron tasks:**
+1. Create task with `schedule: "cron"`
+2. Provide cron expression (e.g., `0 9 * * *`)
+3. Server calls `openclaw cron add` automatically
+4. Job appears in OpenClaw Control UI → Cron Jobs
+
+**Viewing cron jobs:**
+```bash
+openclaw cron list
+```
+
+**Deleting tasks:**
+- Archive or delete task in kanban
+- Associated cron job automatically removed via `openclaw cron rm`
+
+### Auto-Execution Integration
+
+Uses OpenClaw cron wake API:
 
 ```bash
-sudo systemctl status kanban
-sudo journalctl -u kanban -n 50
+curl -X POST http://127.0.0.1:18789/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"method":"cron.wake","params":{"text":"Task message","mode":"now"}}'
 ```
 
-### Can't access via NGINX
+Wake events appear in main session immediately.
 
-Check NGINX config:
-```bash
-sudo nginx -t
-sudo systemctl status nginx
-```
+### Conversational Commands
 
-### Auto-execution not working
+The Big Man can manage kanban through SKILL.md instructions:
 
-Check execution log:
-```bash
-curl http://127.0.0.1:18790/api/executions/log \
-  -H "Authorization: Bearer $TOKEN"
-```
+- Reads `~/.openclaw/kanban-board.json` for task data
+- Uses API endpoints to create/update/delete/move tasks
+- Reports task status in natural language
+- Suggests tasks based on context
+
+---
+
+## Best Practices
+
+### Task Organization
+
+**Backlog:**
+- Future ideas
+- Low-priority items
+- Things to do "someday"
+
+**To Do:**
+- Ready to start
+- Next actions
+- Prioritized work
+
+**In Progress:**
+- Active work
+- Keep this column small (WIP limits)
+- Auto-executes when moved here
+
+**Done:**
+- Recently completed
+- Archive when column gets cluttered
+- Keeps recent history visible
+
+### Schedule Type Selection
+
+| Use Case | Schedule Type |
+|----------|---------------|
+| Build a feature | Once |
+| Fix a bug | Once |
+| Daily standup reminder | Cron (`0 9 * * 1-5`) |
+| Weekly review | Cron (`0 10 * * 1`) |
+| Periodic maintenance | Cron or Heartbeat |
+| Automatic behavior | HEARTBEAT.md (not kanban) |
+
+### Archive Strategy
+
+**When to archive:**
+- Done column has >10 tasks
+- Task completed >1 week ago
+- Need to reduce visual clutter
+
+**When to permanently delete:**
+- Old tasks no longer relevant
+- Archived >1 month ago
+- Sensitive information to remove
+
+**When to restore:**
+- Need to revisit completed work
+- Task wasn't actually done
+- Want to move to another column
+
+### Priority Guidelines
+
+**High:** Urgent, blocks other work  
+**Medium:** Important, should do soon  
+**Low:** Nice to have, when time allows
+
+---
 
 ## License
 
@@ -433,6 +1106,12 @@ MIT
 
 ---
 
-**The Big Man says:** Keep it simple. Keep it sorted. Keep it secure. Nae pish. 💪
+## Links
 
-**GitHub:** https://github.com/therealaibigman/kanban-skill
+- **GitHub:** https://github.com/therealaibigman/kanban-skill
+- **OpenClaw Docs:** https://docs.openclaw.ai
+- **Skill Location:** `~/.openclaw/workspace/skills/kanban/`
+
+---
+
+**The Big Man says:** Keep it simple. Keep it sorted. Keep it secure. Nae pish. 💪🏴
