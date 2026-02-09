@@ -267,7 +267,6 @@ function createCardElement(card) {
     // Handle drop on card (reordering within same column)
     cardElement.addEventListener('drop', async (e) => {
         e.preventDefault();
-        e.stopPropagation();
         
         cardElement.classList.remove('drag-over-top', 'drag-over-bottom');
         
@@ -276,8 +275,10 @@ function createCardElement(card) {
         const targetColumn = card.column;
         const sourceColumn = draggedCard.column;
         
-        // Same column = reorder
+        // Same column = reorder (stop propagation to prevent column handler)
         if (targetColumn === sourceColumn) {
+            e.stopPropagation(); // Only stop for reordering
+            
             const container = cardElement.parentElement;
             const allCards = Array.from(container.children);
             let targetIndex = allCards.indexOf(cardElement);
@@ -313,6 +314,7 @@ function createCardElement(card) {
                 alert('Failed to reorder card');
             }
         }
+        // Different column = let the column container handle it (don't stop propagation)
     });
 
     // Click to edit (don't trigger during drag)
