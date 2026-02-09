@@ -308,6 +308,7 @@ function openEditModal(card) {
 
     document.getElementById('cardIdInput').value = card.id;
     document.getElementById('cardCurrentColumn').value = card.column;
+    document.getElementById('cardColumnInput').value = card.column;
     document.getElementById('cardTitleInput').value = card.title;
     document.getElementById('cardDescriptionInput').value = card.description || '';
     document.getElementById('cardPriorityInput').value = card.priority;
@@ -341,6 +342,7 @@ async function saveCard() {
     debugLog('Saving card');
     const cardId = document.getElementById('cardIdInput').value;
     const currentColumn = document.getElementById('cardCurrentColumn').value;
+    const targetColumn = document.getElementById('cardColumnInput').value;
     const title = document.getElementById('cardTitleInput').value;
     const description = document.getElementById('cardDescriptionInput').value;
     const priority = document.getElementById('cardPriorityInput').value;
@@ -362,7 +364,7 @@ async function saveCard() {
             priority, 
             tags,
             dueDate,
-            column: currentColumn,
+            column: cardId ? currentColumn : targetColumn, // Use targetColumn for new cards
             schedule
         };
         
@@ -439,7 +441,8 @@ async function reloadHeartbeat() {
 // Event listeners
 document.getElementById('addCardBtn').addEventListener('click', () => {
     document.getElementById('cardIdInput').value = '';
-    document.getElementById('cardCurrentColumn').value = 'todo';
+    document.getElementById('cardCurrentColumn').value = '';
+    document.getElementById('cardColumnInput').value = 'backlog';
     document.getElementById('cardTitleInput').value = '';
     document.getElementById('cardDescriptionInput').value = '';
     document.getElementById('cardPriorityInput').value = 'medium';

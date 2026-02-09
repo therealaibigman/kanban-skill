@@ -123,6 +123,9 @@ class KanbanBoard {
     }
 
     addCard(options) {
+        // Default to backlog unless specified
+        const targetColumn = options.column || 'backlog';
+        
         const card = {
             id: uuidv4(),
             title: options.title,
@@ -132,14 +135,14 @@ class KanbanBoard {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             dueDate: options.dueDate || null,
-            column: 'todo',
+            column: targetColumn,
             schedule: options.schedule || 'once', // once, heartbeat, cron
             cronExpression: options.cronExpression || null,
             cronJobId: options.cronJobId || null
         };
 
-        // Always add to todo column
-        this.columns.todo.push(card);
+        // Add to specified column
+        this.columns[targetColumn].push(card);
         this.saveBoard();
         
         // If cron schedule, create OpenClaw cron job
