@@ -533,6 +533,63 @@ app.delete('/api/cards/:id/comments/:commentId', (req, res) => {
     }
 });
 
+// Subtasks endpoints
+app.post('/api/cards/:id/subtasks', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const { text } = req.body;
+        
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Subtask text is required' });
+        }
+        
+        const subtask = board.addSubtask(cardId, text.trim());
+        res.status(201).json(subtask);
+    } catch (error) {
+        console.error('Error adding subtask:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.get('/api/cards/:id/subtasks', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const subtasks = board.getSubtasks(cardId);
+        res.json(subtasks);
+    } catch (error) {
+        console.error('Error fetching subtasks:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.put('/api/cards/:id/subtasks/:subtaskId', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const { id: cardId, subtaskId } = req.params;
+        const updates = req.body;
+        
+        const subtask = board.updateSubtask(cardId, subtaskId, updates);
+        res.json(subtask);
+    } catch (error) {
+        console.error('Error updating subtask:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.delete('/api/cards/:id/subtasks/:subtaskId', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const { id: cardId, subtaskId } = req.params;
+        const deletedSubtask = board.deleteSubtask(cardId, subtaskId);
+        res.json(deletedSubtask);
+    } catch (error) {
+        console.error('Error deleting subtask:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });

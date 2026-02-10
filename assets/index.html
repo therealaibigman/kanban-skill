@@ -135,6 +135,33 @@
             transform: translateY(-4px);
             box-shadow: 0 12px 40px rgba(0,0,0,0.2);
         }
+        
+        /* Dark Mode Styles */
+        .dark-mode body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        .dark-mode .glass {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .dark-mode .stat-card {
+            background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .dark-mode .card-shadow {
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        
+        .dark-mode .column-container:hover {
+            transform: translateY(-2px);
+        }
+        
+        .dark-mode .tag {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        }
     </style>
 </head>
 <body class="font-sans">
@@ -185,6 +212,9 @@
                     <p class="text-white/70">Nae pish, pure practical work</p>
                 </div>
                 <div class="flex gap-3">
+                    <button id="themeToggleBtn" class="bg-gray-700 text-white py-2 px-4 rounded-xl font-semibold hover:bg-gray-600 transition-all" title="Toggle Dark Mode">
+                        🌙
+                    </button>
                     <button id="addCardBtn" class="bg-white text-purple-700 py-2 px-6 rounded-xl font-semibold hover:bg-white/90 transition-all transform hover:scale-105">
                         + Add Task
                     </button>
@@ -319,6 +349,23 @@
                 </div>
             </div>
             
+            <!-- Subtasks Section -->
+            <div class="mt-6 border-t border-white/20 pt-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="text-white/90 text-lg font-semibold">✅ Subtasks</h4>
+                    <span id="subtaskProgress" class="text-white/70 text-sm"></span>
+                </div>
+                <div id="subtasksContainer" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                    <!-- Subtasks will be populated here -->
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="newSubtaskInput" placeholder="Add a subtask..." class="flex-1 px-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50">
+                    <button id="addSubtaskBtn" class="bg-white/30 text-white py-2 px-4 rounded-xl font-semibold hover:bg-white/40 transition-all">
+                        ➕
+                    </button>
+                </div>
+            </div>
+
             <!-- Comments Section -->
             <div class="mt-6 border-t border-white/20 pt-6">
                 <h4 class="text-white/90 text-lg font-semibold mb-3">💬 Comments</h4>

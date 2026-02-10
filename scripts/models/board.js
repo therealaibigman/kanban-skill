@@ -530,6 +530,117 @@ class KanbanBoard {
         console.log(`[Comment] Deleted from ${card.title}`);
         return deletedComment;
     }
+
+    // === SUBTASKS ===
+
+    addSubtask(cardId, text) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        if (!card.subtasks) {
+            card.subtasks = [];
+        }
+
+        const subtask = {
+            id: uuidv4(),
+            text: text,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+
+        card.subtasks.push(subtask);
+        card.updatedAt = new Date().toISOString();
+        this.saveBoard();
+
+        console.log(`[Subtask] Added to ${card.title}: ${text}`);
+        return subtask;
+    }
+
+    updateSubtask(cardId, subtaskId, updates) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        if (!card.subtasks) {
+            throw new Error(`Card has no subtasks`);
+        }
+
+        const subtaskIndex = card.subtasks.findIndex(s => s.id === subtaskId);
+        if (subtaskIndex === -1) {
+            throw new Error(`Subtask ${subtaskId} not found`);
+        }
+
+        card.subtasks[subtaskIndex] = {
+            ...card.subtasks[subtaskIndex],
+            ...updates,
+            updatedAt: new Date().toISOString()
+        };
+
+        card.updatedAt = new Date().toISOString();
+        this.saveBoard();
+
+        console.log(`[Subtask] Updated ${subtaskId} on ${card.title}`);
+        return card.subtasks[subtaskIndex];
+    }
+
+    deleteSubtask(cardId, subtaskId) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        if (!card.subtasks) {
+            throw new Error(`Card has no subtasks`);
+        }
+
+        const subtaskIndex = card.subtasks.findIndex(s => s.id === subtaskId);
+        if (subtaskIndex === -1) {
+            throw new Error(`Subtask ${subtaskId} not found`);
+        }
+
+        const [deletedSubtask] = card.subtasks.splice(subtaskIndex, 1);
+        card.updatedAt = new Date().toISOString();
+        this.saveBoard();
+
+        console.log(`[Subtask] Deleted ${subtaskId} from ${card.title}`);
+        return deletedSubtask;
+    }
+
+    getSubtasks(cardId) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        return card.subtasks || [];
+    }
 }
 
 module.exports = KanbanBoard;

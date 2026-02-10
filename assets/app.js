@@ -57,6 +57,7 @@ function showLoginScreen() {
 function showDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
+    initTheme(); // Initialize theme when dashboard shows
     fetchCards(); // Load initial data
 }
 
@@ -99,6 +100,44 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
     if (confirm('Logout and clear authentication?')) {
         clearAuthToken();
         showLoginScreen();
+    }
+});
+
+// === DARK MODE ===
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('kanban_theme');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    
+    if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+        if (themeToggleBtn) themeToggleBtn.textContent = '☀️';
+    } else {
+        if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
+    }
+}
+
+function toggleTheme() {
+    const html = document.documentElement;
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    
+    if (html.classList.contains('dark-mode')) {
+        html.classList.remove('dark-mode');
+        localStorage.setItem('kanban_theme', 'light');
+        if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
+    } else {
+        html.classList.add('dark-mode');
+        localStorage.setItem('kanban_theme', 'dark');
+        if (themeToggleBtn) themeToggleBtn.textContent = '☀️';
+    }
+}
+
+// Theme toggle button
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
     }
 });
 
@@ -193,6 +232,15 @@ function createCardElement(card) {
     
     const scheduleIcon = scheduleIcons[card.schedule] || '';
     
+    // Subtask progress
+    let subtaskHtml = '';
+    if (card.subtasks && card.subtasks.length > 0) {
+        const completed = card.subtasks.filter(s => s.completed).length;
+        const total = card.subtasks.length;
+        const percent = Math.round((completed / total) * 100);
+        subtaskHtml = `<div class="mt-2"><div class="flex items-center gap-2 text-xs text-gray-600"><span class="font-semibold">✅ ${completed}/${total}</span><div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden"><div class="h-full bg-green-500 rounded-full" style="width: ${percent}%"></div></div></div></div>`;
+    }
+
     cardElement.innerHTML = `
         <div class="flex justify-between items-start mb-2">
             <h3 class="font-bold text-gray-800 text-lg flex-1">${scheduleIcon} ${card.title || 'Untitled Card'}</h3>
@@ -200,9 +248,10 @@ function createCardElement(card) {
         </div>
         ${tagsHtml}
         <p class="text-gray-600 text-sm mb-2">${card.description || ''}</p>
-        ${card.dueDate ? `<div class="text-xs text-purple-600 font-semibold">📅 ${card.dueDate}</div>` : ''}
-        ${card.schedule === 'cron' && card.cronExpression ? `<div class="text-xs text-blue-600 font-semibold">⏰ ${card.cronExpression}</div>` : ''}
-        ${card.schedule === 'heartbeat' ? `<div class="text-xs text-pink-600 font-semibold">💓 Recurring</div>` : ''}
+        ${subtaskHtml}
+        ${card.dueDate ? `<div class="text-xs text-purple-600 font-semibold mt-1">📅 ${card.dueDate}</div>` : ''}
+        ${card.schedule === 'cron' && card.cronExpression ? `<div class="text-xs text-blue-600 font-semibold mt-1">⏰ ${card.cronExpression}</div>` : ''}
+        ${card.schedule === 'heartbeat' ? `<div class="text-xs text-pink-600 font-semibold mt-1">💓 Recurring</div>` : ''}
     `;
 
     // Drag events for the card
@@ -446,9 +495,10 @@ function openEditModal(card) {
 
     modalTitle.textContent = 'Edit Task';
     
-    // Load comments
+    // Load comments and subtasks
     loadComments(card.id);
-    
+    loadSubtasks(card.id);
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -1030,3 +1080,138 @@ document.getElementById('newCommentInput').addEventListener('keypress', (e) => {
         addComment();
     }
 });
+
+// === SUBTASKS ===
+
+async function loadSubtasks(cardId) {
+    try {
+        const response = await fetch(`/api/cards/${cardId}/subtasks`, {
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load subtasks');
+        }
+        
+        const subtasks = await response.json();
+        renderSubtasks(subtasks);
+    } catch (error) {
+        console.error('Error loading subtasks:', error);
+    }
+}
+
+function renderSubtasks(subtasks) {
+    const container = document.getElementById('subtasksContainer');
+    const progressSpan = document.getElementById('subtaskProgress');
+    
+    if (subtasks.length === 0) {
+        container.innerHTML = '<p class="text-white/50 text-sm italic">No subtasks yet</p>';
+        progressSpan.textContent = '';
+        return;
+    }
+    
+    const completed = subtasks.filter(s => s.completed).length;
+    const total = subtasks.length;
+    const percent = Math.round((completed / total) * 100);
+    
+    progressSpan.textContent = `${completed}/${total} (${percent}%)`;
+    
+    container.innerHTML = subtasks.map(subtask => `
+        <div class="flex items-center gap-3 bg-white/10 rounded-lg p-2">
+            <input type="checkbox" 
+                ${subtask.completed ? 'checked' : ''} 
+                onchange="toggleSubtask('${subtask.id}', this.checked)"
+                class="w-5 h-5 rounded border-white/30 bg-white/20 text-green-500 focus:ring-2 focus:ring-white/50 cursor-pointer"
+            >
+            <span class="flex-1 text-white ${subtask.completed ? 'line-through text-white/50' : ''}">${escapeHtml(subtask.text)}</span>
+            <button class="text-white/60 hover:text-red-400 text-xs" onclick="deleteSubtask('${subtask.id}')">🗑️</button>
+        </div>
+    `).join('');
+}
+
+async function addSubtask() {
+    const subtaskInput = document.getElementById('newSubtaskInput');
+    const text = subtaskInput.value.trim();
+    const cardId = document.getElementById('cardIdInput').value;
+    
+    if (!text || !cardId) return;
+    
+    try {
+        const response = await fetch(`/api/cards/${cardId}/subtasks`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ text })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to add subtask');
+        }
+        
+        subtaskInput.value = '';
+        await loadSubtasks(cardId);
+        await fetchCards(); // Refresh to show progress on card
+    } catch (error) {
+        console.error('Error adding subtask:', error);
+        alert('Failed to add subtask');
+    }
+}
+
+async function toggleSubtask(subtaskId, completed) {
+    const cardId = document.getElementById('cardIdInput').value;
+    
+    try {
+        const response = await fetch(`/api/cards/${cardId}/subtasks/${subtaskId}`, {
+            method: 'PUT',
+            headers: authHeaders(),
+            body: JSON.stringify({ completed })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to update subtask');
+        }
+        
+        await loadSubtasks(cardId);
+        await fetchCards(); // Refresh to show progress on card
+    } catch (error) {
+        console.error('Error updating subtask:', error);
+    }
+}
+
+async function deleteSubtask(subtaskId) {
+    if (!confirm('Delete this subtask?')) return;
+    
+    const cardId = document.getElementById('cardIdInput').value;
+    
+    try {
+        const response = await fetch(`/api/cards/${cardId}/subtasks/${subtaskId}`, {
+            method: 'DELETE',
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete subtask');
+        }
+        
+        await loadSubtasks(cardId);
+        await fetchCards(); // Refresh to show progress on card
+    } catch (error) {
+        console.error('Error deleting subtask:', error);
+        alert('Failed to delete subtask');
+    }
+}
+
+// Subtask button handler
+document.getElementById('addSubtaskBtn').addEventListener('click', addSubtask);
+
+// Allow Enter key to add subtask
+document.getElementById('newSubtaskInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        addSubtask();
+    }
+});
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
