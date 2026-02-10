@@ -142,7 +142,12 @@ class KanbanBoard {
             schedule: options.schedule || 'once', // once, heartbeat, cron
             cronExpression: options.cronExpression || null,
             cronJobId: options.cronJobId || null,
-            comments: options.comments || []
+            comments: options.comments || [],
+            tracking: {
+                totalTokens: 0,
+                totalCost: 0,
+                executions: []
+            }
         };
 
         // Add to specified column
@@ -640,6 +645,105 @@ class KanbanBoard {
         }
 
         return card.subtasks || [];
+    }
+
+    // === TRACKING ===
+
+    addTrackingEntry(cardId, tokens, cost, metadata = {}) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        // Initialize tracking if not exists
+        if (!card.tracking) {
+            card.tracking = {
+                totalTokens: 0,
+                totalCost: 0,
+                executions: []
+            };
+        }
+
+        const entry = {
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            tokens: tokens || 0,
+            cost: cost || 0,
+            metadata: metadata
+        };
+
+        card.tracking.executions.push(entry);
+        card.tracking.totalTokens += entry.tokens;
+        card.tracking.totalCost += entry.cost;
+        card.updatedAt = new Date().toISOString();
+
+        this.saveBoard();
+
+        console.log(`[Tracking] Added entry to ${card.title}: ${tokens} tokens, $${cost}`);
+        return entry;
+    }
+
+    getTracking(cardId) {
+        // Find card in any column
+        let card = null;
+        for (const col in this.columns) {
+            card = this.columns[col].find(c => c.id === cardId);
+            if (card) break;
+        }
+
+        if (!card) {
+            throw new Error(`Card ${cardId} not found`);
+        }
+
+        return card.tracking || {
+            totalTokens: 0,
+            totalCost: 0,
+            executions: []
+        };
+    }
+
+    getAllTracking() {
+        const allCards = [
+            ...this.columns.backlog,
+            ...this.columns.todo,
+            ...this.columns['in-progress'],
+            ...this.columns.done
+        ];
+
+        let totalTokens = 0;
+        let totalCost = 0;
+        const taskTracking = [];
+
+        allCards.forEach(card => {
+            if (card.tracking) {
+                totalTokens += card.tracking.totalTokens;
+                totalCost += card.tracking.totalCost;
+                taskTracking.push({
+                    id: card.id,
+                    title: card.title,
+                    column: card.column,
+                    tokens: card.tracking.totalTokens,
+                    cost: card.tracking.totalCost,
+                    executions: card.tracking.executions.length
+                });
+            }
+        });
+
+        return {
+            summary: {
+                totalTokens,
+                totalCost,
+                totalTasks: allCards.length,
+                trackedTasks: taskTracking.length
+            },
+            tasks: taskTracking
+        };
     }
 }
 

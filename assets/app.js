@@ -147,13 +147,6 @@ function debugLog(...args) {
     console.log('[Kanban]', ...args);
 }
 
-function updateStats(columns) {
-    document.getElementById('statBacklog').textContent = columns.backlog.length;
-    document.getElementById('statTodo').textContent = columns.todo.length;
-    document.getElementById('statInProgress').textContent = columns['in-progress'].length;
-    document.getElementById('statDone').textContent = columns.done.length;
-}
-
 function cardsHaveChanged(newColumns) {
     const stringifyCards = (columns) => {
         return Object.entries(columns).map(([col, cards]) => 
@@ -185,8 +178,6 @@ function renderColumns(columns) {
             columnContainer.appendChild(cardElement);
         });
     });
-    
-    updateStats(columns);
 }
 
 let draggedCardElement = null;
@@ -272,6 +263,198 @@ function createCardElement(card) {
         draggedCardElement = null;
         draggedOverCard = null;
     });
+
+    // Touch events for mobile drag-and-drop
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchDragging = false;
+    let touchClone = null;
+    let touchCurrentTarget = null;
+
+    cardElement.addEventListener('touchstart', (e) => {
+        // Only handle single finger, not scrolling
+        if (e.touches.length !== 1) return;
+        
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchDragging = false;
+        
+        // Long press detection for drag start
+        cardElement.touchTimer = setTimeout(() => {
+            touchDragging = true;
+            draggedCard = card;
+            draggedCardElement = cardElement;
+            cardElement.classList.add('dragging');
+            
+            // Create visual clone
+            touchClone = cardElement.cloneNode(true);
+            touchClone.style.position = 'fixed';
+            touchClone.style.width = cardElement.offsetWidth + 'px';
+            touchClone.style.opacity = '0.8';
+            touchClone.style.zIndex = '1000';
+            touchClone.style.pointerEvents = 'none';
+            touchClone.style.transform = 'rotate(2deg) scale(1.05)';
+            document.body.appendChild(touchClone);
+            
+            updateTouchClonePosition(touch);
+            
+            // Vibrate if supported
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, 500);
+    }, { passive: false });
+
+    cardElement.addEventListener('touchmove', (e) => {
+        if (!cardElement.touchTimer && !touchDragging) return;
+        
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - touchStartX);
+        const deltaY = Math.abs(touch.clientY - touchStartY);
+        
+        // Cancel drag if scrolling
+        if (!touchDragging && (deltaX > 10 || deltaY > 10)) {
+            clearTimeout(cardElement.touchTimer);
+            cardElement.touchTimer = null;
+            return;
+        }
+        
+        if (touchDragging) {
+            e.preventDefault();
+            updateTouchClonePosition(touch);
+            
+            // Find element under touch
+            touchClone.style.display = 'none';
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            touchClone.style.display = 'block';
+            
+            if (elemBelow) {
+                const targetCard = elemBelow.closest('.card');
+                const targetColumn = elemBelow.closest('.card-container');
+                
+                // Clear previous indicators
+                document.querySelectorAll('.card').forEach(c => {
+                    c.classList.remove('drag-over-top', 'drag-over-bottom');
+                });
+                document.querySelectorAll('.card-container').forEach(c => {
+                    c.style.backgroundColor = '';
+                });
+                
+                if (targetCard && targetCard !== cardElement) {
+                    const rect = targetCard.getBoundingClientRect();
+                    const midpoint = rect.top + rect.height / 2;
+                    
+                    if (touch.clientY < midpoint) {
+                        targetCard.classList.add('drag-over-top');
+                    } else {
+                        targetCard.classList.add('drag-over-bottom');
+                    }
+                    touchCurrentTarget = targetCard;
+                } else if (targetColumn) {
+                    targetColumn.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                    touchCurrentTarget = targetColumn;
+                }
+            }
+        }
+    }, { passive: false });
+
+    cardElement.addEventListener('touchend', async (e) => {
+        clearTimeout(cardElement.touchTimer);
+        cardElement.touchTimer = null;
+        
+        if (!touchDragging) return;
+        
+        touchDragging = false;
+        cardElement.classList.remove('dragging');
+        
+        if (touchClone) {
+            touchClone.remove();
+            touchClone = null;
+        }
+        
+        // Clear all indicators
+        document.querySelectorAll('.card').forEach(c => {
+            c.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        document.querySelectorAll('.card-container').forEach(c => {
+            c.style.backgroundColor = '';
+        });
+        
+        const touch = e.changedTouches[0];
+        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (elemBelow && draggedCard) {
+            const targetCard = elemBelow.closest('.card');
+            const targetColumn = elemBelow.closest('.card-container');
+            
+            if (targetCard && targetCard !== cardElement) {
+                // Drop on another card - determine position
+                const rect = targetCard.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+                const insertBefore = touch.clientY < midpoint;
+                
+                // Same column reorder
+                if (targetCard.dataset.column === card.column) {
+                    await handleReorder(draggedCard, targetCard, insertBefore);
+                } else {
+                    // Different column move
+                    await moveCardToColumn(draggedCard, targetCard.dataset.column);
+                }
+            } else if (targetColumn) {
+                // Drop on empty column area
+                await moveCardToColumn(draggedCard, targetColumn.dataset.column);
+            }
+        }
+        
+        draggedCard = null;
+        draggedCardElement = null;
+        touchCurrentTarget = null;
+    });
+
+    function updateTouchClonePosition(touch) {
+        if (touchClone) {
+            touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
+            touchClone.style.top = (touch.clientY - touchClone.offsetHeight / 2) + 'px';
+        }
+    }
+
+    async function handleReorder(card, targetCard, insertBefore) {
+        try {
+            const container = targetCard.parentElement;
+            const allCards = Array.from(container.children);
+            const fromIndex = allCards.findIndex(c => c.dataset.cardId === card.id);
+            const toIndex = allCards.findIndex(c => c === targetCard);
+            
+            let newPosition = insertBefore ? toIndex : toIndex + 1;
+            if (fromIndex < newPosition) newPosition--;
+            
+            const response = await fetch(`/api/cards/${card.id}/reorder`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify({ column: card.column, position: newPosition })
+            });
+            
+            if (!response.ok) throw new Error('Failed to reorder');
+            await fetchCards();
+        } catch (error) {
+            console.error('Error reordering:', error);
+        }
+    }
+
+    async function moveCardToColumn(card, toColumn) {
+        try {
+            const fromColumn = card.column;
+            const response = await fetch(`/api/cards/${card.id}/move`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify({ fromColumn, toColumn })
+            });
+            
+            if (!response.ok) throw new Error('Failed to move card');
+            await fetchCards();
+        } catch (error) {
+            console.error('Error moving card:', error);
+        }
+    }
 
     // Reordering: drag over other cards
     cardElement.addEventListener('dragover', (e) => {
@@ -495,9 +678,11 @@ function openEditModal(card) {
 
     modalTitle.textContent = 'Edit Task';
     
-    // Load comments and subtasks
+    // Load comments, subtasks, tracking, and subagents
     loadComments(card.id);
     loadSubtasks(card.id);
+    loadTracking(card.id);
+    loadSubagents(card.id);
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -1080,6 +1265,313 @@ document.getElementById('newCommentInput').addEventListener('keypress', (e) => {
         addComment();
     }
 });
+
+// === TRACKING ===
+
+async function loadTracking(cardId) {
+    try {
+        const response = await fetch(`/api/cards/${cardId}/tracking`, {
+            headers: authHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load tracking');
+        }
+
+        const tracking = await response.json();
+        renderTracking(tracking);
+    } catch (error) {
+        console.error('Error loading tracking:', error);
+    }
+}
+
+function renderTracking(tracking) {
+    const tokensDiv = document.getElementById('trackingTokens');
+    const costDiv = document.getElementById('trackingCost');
+    const executionsDiv = document.getElementById('trackingExecutions');
+
+    tokensDiv.textContent = (tracking.totalTokens || 0).toLocaleString();
+    costDiv.textContent = '$' + (tracking.totalCost || 0).toFixed(2);
+
+    if (!tracking.executions || tracking.executions.length === 0) {
+        executionsDiv.innerHTML = '<p class="text-white/50 text-sm italic">No tracking entries yet</p>';
+        return;
+    }
+
+    executionsDiv.innerHTML = tracking.executions.slice().reverse().map(entry => {
+        const date = new Date(entry.timestamp).toLocaleString();
+        const notes = entry.metadata && entry.metadata.notes ? ` - ${entry.metadata.notes}` : '';
+        return `
+            <div class="flex justify-between items-center bg-white/10 rounded-lg p-2">
+                <span class="text-white/80">${entry.tokens.toLocaleString()} tokens · $${entry.cost.toFixed(2)}${notes}</span>
+                <span class="text-white/50 text-xs">${date}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function openTrackingModal() {
+    const modal = document.getElementById('trackingEntryModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('trackingTokensInput').value = '';
+    document.getElementById('trackingCostInput').value = '';
+    document.getElementById('trackingNotesInput').value = '';
+    document.getElementById('trackingTokensInput').focus();
+}
+
+function closeTrackingModal() {
+    const modal = document.getElementById('trackingEntryModal');
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+}
+
+async function saveTrackingEntry() {
+    const cardId = document.getElementById('cardIdInput').value;
+    const tokens = parseInt(document.getElementById('trackingTokensInput').value) || 0;
+    const cost = parseFloat(document.getElementById('trackingCostInput').value) || 0;
+    const notes = document.getElementById('trackingNotesInput').value.trim();
+
+    if (!cardId || (tokens === 0 && cost === 0)) {
+        alert('Please enter tokens or cost');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/cards/${cardId}/tracking`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                tokens,
+                cost,
+                metadata: { notes }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to add tracking entry');
+        }
+
+        closeTrackingModal();
+        await loadTracking(cardId);
+    } catch (error) {
+        console.error('Error adding tracking entry:', error);
+        alert('Failed to add tracking entry');
+    }
+}
+
+// Tracking button handlers
+document.getElementById('addTrackingBtn').addEventListener('click', openTrackingModal);
+document.getElementById('saveTrackingBtn').addEventListener('click', saveTrackingEntry);
+document.getElementById('cancelTrackingBtn').addEventListener('click', closeTrackingModal);
+
+// Allow Enter key to save tracking
+document.getElementById('trackingCostInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        saveTrackingEntry();
+    }
+});
+
+// === SUBAGENTS ===
+
+let currentPlan = null;
+
+async function loadSubagents(cardId) {
+    try {
+        const response = await fetch(`/api/subagents/plans?parentTaskId=${cardId}`, {
+            headers: authHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load subagent plans');
+        }
+
+        const plans = await response.json();
+        renderSubagents(plans);
+    } catch (error) {
+        console.error('Error loading subagents:', error);
+        document.getElementById('subagentsContainer').innerHTML = '<p class="text-white/50 text-sm italic">No subagent plans yet</p>';
+    }
+}
+
+function renderSubagents(plans) {
+    const container = document.getElementById('subagentsContainer');
+
+    if (!plans || plans.length === 0) {
+        container.innerHTML = '<p class="text-white/50 text-sm italic">No subagent plans yet. Click "Plan Task" to break this task into sub-tasks for agents.</p>';
+        return;
+    }
+
+    container.innerHTML = plans.map(plan => {
+        const completed = plan.subtasks.filter(st => st.status === 'completed').length;
+        const total = plan.subtasks.length;
+        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return `
+            <div class="bg-white/10 rounded-xl p-4 border border-white/20">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <span class="text-white font-semibold">Plan: ${escapeHtml(plan.title)}</span>
+                        <span class="text-white/50 text-sm ml-2">${completed}/${total} (${percent}%)</span>
+                    </div>
+                    <span class="px-2 py-1 rounded text-xs font-semibold ${getStatusColor(plan.status)}">${plan.status}</span>
+                </div>
+                <div class="w-full bg-white/10 rounded-full h-2 mb-3">
+                    <div class="bg-purple-500 h-2 rounded-full transition-all" style="width: ${percent}%"></div>
+                </div>
+                <div class="space-y-1 text-sm">
+                    ${plan.subtasks.map(st => `
+                        <div class="flex justify-between items-center bg-white/5 rounded p-2">
+                            <span class="text-white/80 ${st.status === 'completed' ? 'line-through' : ''}">${st.index}. ${escapeHtml(st.title)}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs ${getStatusColor(st.status)}">${st.status}</span>
+                                ${st.status === 'pending' ? `<button onclick="spawnSubagent('${plan.id}', '${st.id}')" class="text-purple-400 hover:text-purple-300 text-xs">🚀 Spawn</button>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'completed': 'text-green-400 bg-green-500/20',
+        'executing': 'text-blue-400 bg-blue-500/20',
+        'in-progress': 'text-orange-400 bg-orange-500/20',
+        'assigned': 'text-yellow-400 bg-yellow-500/20',
+        'pending': 'text-gray-400 bg-gray-500/20',
+        'failed': 'text-red-400 bg-red-500/20',
+        'planned': 'text-purple-400 bg-purple-500/20'
+    };
+    return colors[status] || 'text-gray-400';
+}
+
+async function planSubagents() {
+    const cardId = document.getElementById('cardIdInput').value;
+    const title = document.getElementById('cardTitleInput').value;
+    const description = document.getElementById('cardDescriptionInput').value;
+
+    if (!cardId || !title) {
+        alert('Card must have a title to plan subagents');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/subagents/plan', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                parentTaskId: cardId,
+                title,
+                description
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create plan');
+        }
+
+        currentPlan = await response.json();
+        renderPlanModal(currentPlan);
+        openSubagentPlanModal();
+    } catch (error) {
+        console.error('Error planning subagents:', error);
+        alert('Failed to create plan: ' + error.message);
+    }
+}
+
+function renderPlanModal(plan) {
+    const container = document.getElementById('subagentPlanContent');
+
+    container.innerHTML = `
+        <div class="bg-white/10 rounded-xl p-4">
+            <h5 class="text-white font-semibold mb-2">${escapeHtml(plan.title)}</h5>
+            <p class="text-white/70 text-sm mb-4">${escapeHtml(plan.description || '')}</p>
+            <h6 class="text-white/90 font-semibold mb-2">Generated Sub-tasks:</h6>
+            <div class="space-y-2">
+                ${plan.subtasks.map((st, i) => `
+                    <div class="flex items-start gap-3 bg-white/5 rounded p-3">
+                        <span class="text-purple-400 font-bold">${i + 1}</span>
+                        <div>
+                            <span class="text-white font-medium">${escapeHtml(st.title)}</span>
+                            <p class="text-white/60 text-sm">${escapeHtml(st.description)}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function openSubagentPlanModal() {
+    const modal = document.getElementById('subagentPlanModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeSubagentPlanModal() {
+    const modal = document.getElementById('subagentPlanModal');
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+    currentPlan = null;
+}
+
+async function executePlan() {
+    if (!currentPlan) return;
+
+    try {
+        // Spawn agents for all pending subtasks
+        for (const subtask of currentPlan.subtasks) {
+            if (subtask.status === 'pending') {
+                await spawnSubagent(currentPlan.id, subtask.id);
+            }
+        }
+
+        closeSubagentPlanModal();
+
+        // Reload to show updated status
+        const cardId = document.getElementById('cardIdInput').value;
+        await loadSubagents(cardId);
+    } catch (error) {
+        console.error('Error executing plan:', error);
+        alert('Failed to execute plan: ' + error.message);
+    }
+}
+
+async function spawnSubagent(planId, subtaskId) {
+    try {
+        const response = await fetch('/api/subagents/spawn', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                planId,
+                subtaskId,
+                name: `Agent-${subtaskId.slice(0, 4)}`
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to spawn subagent');
+        }
+
+        const agent = await response.json();
+        console.log('Subagent spawned:', agent);
+
+        // Reload subagents display
+        const cardId = document.getElementById('cardIdInput').value;
+        await loadSubagents(cardId);
+    } catch (error) {
+        console.error('Error spawning subagent:', error);
+        alert('Failed to spawn subagent: ' + error.message);
+    }
+}
+
+// Subagent button handlers
+document.getElementById('planSubagentsBtn').addEventListener('click', planSubagents);
+document.getElementById('executePlanBtn').addEventListener('click', executePlan);
+document.getElementById('cancelPlanBtn').addEventListener('click', closeSubagentPlanModal);
 
 // === SUBTASKS ===
 

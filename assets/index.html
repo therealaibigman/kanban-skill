@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Big Man's Kanban Board</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -162,6 +162,182 @@
         .dark-mode .tag {
             background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
         }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 1024px) {
+            .column-container {
+                min-height: 300px;
+            }
+            .card-container {
+                min-height: 250px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            /* Stack columns vertically on mobile */
+            .grid-cols-4 {
+                grid-template-columns: 1fr;
+            }
+            
+            /* Horizontal scroll for kanban board */
+            #dashboard .grid-cols-4 {
+                display: flex;
+                flex-direction: row;
+                overflow-x: auto;
+                gap: 1rem;
+                padding-bottom: 1rem;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x mandatory;
+            }
+            
+            #dashboard .grid-cols-4 > div {
+                flex: 0 0 85vw;
+                min-width: 280px;
+                max-width: 320px;
+                scroll-snap-align: start;
+            }
+            
+            /* Smaller column containers */
+            .column-container {
+                min-height: 400px;
+                max-height: 70vh;
+            }
+            
+            .card-container {
+                min-height: 300px;
+                overflow-y: auto;
+            }
+            
+            /* Touch-friendly header buttons */
+            #dashboard button {
+                min-height: 44px;
+                min-width: 44px;
+                padding: 0.5rem 1rem;
+            }
+            
+            /* Collapsible columns for mobile */
+            .column-container.collapsed .card-container {
+                display: none;
+            }
+            
+            .column-container.collapsed {
+                min-height: auto;
+            }
+            
+            .column-toggle {
+                display: block;
+                background: none;
+                border: none;
+                color: white;
+                font-size: 1.2rem;
+                cursor: pointer;
+                min-width: 44px;
+                min-height: 44px;
+            }
+            
+            /* Mobile-optimized modals */
+            #cardModal > div,
+            #archiveModal > div,
+            #exportModal > div,
+            #importModal > div {
+                width: 95vw;
+                max-height: 90vh;
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            /* Larger touch targets for cards */
+            .card {
+                min-height: 44px;
+                padding: 1rem;
+            }
+            
+            /* Header adjustments */
+            #dashboard .glass.rounded-2xl.p-6 {
+                padding: 1rem;
+            }
+            
+            #dashboard h1 {
+                font-size: 1.5rem;
+            }
+            
+            /* Touch-friendly form inputs */
+            input, select, textarea, button {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            /* Horizontal scrollbar styling */
+            #dashboard .grid-cols-4::-webkit-scrollbar {
+                height: 8px;
+            }
+            
+            #dashboard .grid-cols-4::-webkit-scrollbar-track {
+                background: rgba(255,255,255,0.1);
+                border-radius: 4px;
+            }
+            
+            #dashboard .grid-cols-4::-webkit-scrollbar-thumb {
+                background: rgba(255,255,255,0.3);
+                border-radius: 4px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            /* Even smaller screens */
+            #dashboard .grid-cols-4 > div {
+                flex: 0 0 90vw;
+            }
+            
+            .stat-card {
+                padding: 0.75rem;
+            }
+            
+            #dashboard .text-3xl {
+                font-size: 1.5rem;
+            }
+            
+            /* Stack header buttons */
+            #dashboard .flex.gap-3 {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            
+            #dashboard button {
+                font-size: 0.875rem;
+                padding: 0.5rem;
+            }
+        }
+        
+        /* Touch device optimizations */
+        @media (hover: none) and (pointer: coarse) {
+            .card:hover {
+                transform: none;
+            }
+            
+            .card:active {
+                transform: scale(0.98);
+            }
+            
+            .column-container:hover {
+                transform: none;
+            }
+            
+            /* Larger touch targets */
+            .card {
+                touch-action: pan-y;
+            }
+        }
+        
+        /* Landscape mode on mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .column-container {
+                max-height: 80vh;
+            }
+            
+            #dashboard .grid-cols-4 > div {
+                flex: 0 0 40vw;
+            }
+        }
     </style>
 </head>
 <body class="font-sans">
@@ -234,26 +410,6 @@
             </div>
         </div>
 
-        <!-- Stats Row -->
-        <div class="grid grid-cols-4 gap-4 mb-6">
-            <div class="stat-card rounded-xl p-4 text-center">
-                <div class="text-white/70 text-sm font-semibold mb-1">Backlog</div>
-                <div id="statBacklog" class="text-3xl font-bold text-white">0</div>
-            </div>
-            <div class="stat-card rounded-xl p-4 text-center">
-                <div class="text-white/70 text-sm font-semibold mb-1">To Do</div>
-                <div id="statTodo" class="text-3xl font-bold text-white">0</div>
-            </div>
-            <div class="stat-card rounded-xl p-4 text-center">
-                <div class="text-white/70 text-sm font-semibold mb-1">In Progress</div>
-                <div id="statInProgress" class="text-3xl font-bold text-white">0</div>
-            </div>
-            <div class="stat-card rounded-xl p-4 text-center">
-                <div class="text-white/70 text-sm font-semibold mb-1">Done</div>
-                <div id="statDone" class="text-3xl font-bold text-white">0</div>
-            </div>
-        </div>
-        
         <!-- Kanban Board -->
         <div class="grid grid-cols-4 gap-4">
             <!-- Backlog Column -->
@@ -377,6 +533,89 @@
                     <button id="addCommentBtn" class="bg-white/30 text-white py-2 px-4 rounded-xl font-semibold hover:bg-white/40 transition-all">
                         ➕
                     </button>
+                </div>
+            </div>
+
+            <!-- Tracking Section -->
+            <div class="mt-6 border-t border-white/20 pt-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="text-white/90 text-lg font-semibold">📊 Tracking</h4>
+                    <button id="addTrackingBtn" class="bg-white/30 text-white py-1 px-3 rounded-lg font-semibold hover:bg-white/40 transition-all text-sm">
+                        ➕ Add Entry
+                    </button>
+                </div>
+                <div id="trackingSummary" class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white/10 rounded-xl p-3 text-center">
+                        <div class="text-white/70 text-xs font-semibold mb-1">Total Tokens</div>
+                        <div id="trackingTokens" class="text-2xl font-bold text-white">0</div>
+                    </div>
+                    <div class="bg-white/10 rounded-xl p-3 text-center">
+                        <div class="text-white/70 text-xs font-semibold mb-1">Total Cost</div>
+                        <div id="trackingCost" class="text-2xl font-bold text-green-400">$0.00</div>
+                    </div>
+                </div>
+                <div id="trackingExecutions" class="space-y-2 max-h-32 overflow-y-auto text-sm">
+                    <!-- Tracking entries will be populated here -->
+                </div>
+            </div>
+
+            <!-- Add Tracking Entry Modal (hidden by default) -->
+            <div id="trackingEntryModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm items-center justify-center z-50 p-4">
+                <div class="glass rounded-3xl p-6 w-full max-w-md card-shadow">
+                    <h4 class="text-white/90 text-lg font-semibold mb-4">Add Tracking Entry</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-white/90 text-sm font-semibold mb-2">Tokens</label>
+                            <input type="number" id="trackingTokensInput" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-white/90 text-sm font-semibold mb-2">Cost (USD)</label>
+                            <input type="number" step="0.01" id="trackingCostInput" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-white/90 text-sm font-semibold mb-2">Notes (optional)</label>
+                            <input type="text" id="trackingNotesInput" class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50" placeholder="Execution details...">
+                        </div>
+                        <div class="flex gap-3">
+                            <button id="saveTrackingBtn" class="flex-1 bg-green-500 text-white py-3 px-6 rounded-xl font-semibold hover:bg-green-600 transition-all">
+                                Save
+                            </button>
+                            <button id="cancelTrackingBtn" class="bg-white/20 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SubAgents Section -->
+            <div class="mt-6 border-t border-white/20 pt-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="text-white/90 text-lg font-semibold">🤖 SubAgents</h4>
+                    <button id="planSubagentsBtn" class="bg-purple-500 text-white py-1 px-3 rounded-lg font-semibold hover:bg-purple-600 transition-all text-sm">
+                        📋 Plan Task
+                    </button>
+                </div>
+                <div id="subagentsContainer" class="space-y-3">
+                    <!-- Subagent plans will be populated here -->
+                </div>
+            </div>
+
+            <!-- SubAgent Plan Modal -->
+            <div id="subagentPlanModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm items-center justify-center z-50 p-4">
+                <div class="glass rounded-3xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto card-shadow">
+                    <h4 class="text-white/90 text-xl font-semibold mb-4">📋 Plan SubAgents</h4>
+                    <div id="subagentPlanContent" class="space-y-4">
+                        <!-- Plan content will be populated here -->
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button id="executePlanBtn" class="flex-1 bg-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:bg-purple-600 transition-all">
+                            🚀 Execute Plan
+                        </button>
+                        <button id="cancelPlanBtn" class="bg-white/20 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             </div>
             

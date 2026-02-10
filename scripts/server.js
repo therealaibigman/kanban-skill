@@ -590,6 +590,44 @@ app.delete('/api/cards/:id/subtasks/:subtaskId', (req, res) => {
     }
 });
 
+// Tracking endpoints
+app.post('/api/cards/:id/tracking', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const { tokens, cost, metadata } = req.body;
+
+        const entry = board.addTrackingEntry(cardId, tokens, cost, metadata);
+        res.status(201).json(entry);
+    } catch (error) {
+        console.error('Error adding tracking entry:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.get('/api/cards/:id/tracking', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const cardId = req.params.id;
+        const tracking = board.getTracking(cardId);
+        res.json(tracking);
+    } catch (error) {
+        console.error('Error fetching tracking:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+app.get('/api/tracking', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const tracking = board.getAllTracking();
+        res.json(tracking);
+    } catch (error) {
+        console.error('Error fetching all tracking:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });
@@ -640,6 +678,117 @@ app.delete('/api/executions/queue', async (req, res) => {
     } catch (error) {
         console.error('Error clearing task queue:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// === SUBAGENT ENDPOINTS ===
+
+const SubAgentManager = require('./subagent-manager');
+
+// Plan a task into subtasks
+app.post('/api/subagents/plan', async (req, res) => {
+    try {
+        const { parentTaskId, title, description } = req.body;
+        
+        if (!parentTaskId || !title) {
+            return res.status(400).json({ error: 'parentTaskId and title are required' });
+        }
+        
+        const manager = new SubAgentManager();
+        const plan = await manager.planTask(parentTaskId, { title, description });
+        
+        res.status(201).json(plan);
+    } catch (error) {
+        console.error('Error planning task:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create and spawn a subagent for a subtask
+app.post('/api/subagents/spawn', async (req, res) => {
+    try {
+        const { planId, subtaskId, name, model } = req.body;
+        
+        if (!planId || !subtaskId) {
+            return res.status(400).json({ error: 'planId and subtaskId are required' });
+        }
+        
+        const manager = new SubAgentManager();
+        const agent = await manager.createSubagent(planId, subtaskId, { name, model });
+        
+        res.status(201).json(agent);
+    } catch (error) {
+        console.error('Error spawning subagent:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get plan status
+app.get('/api/subagents/plans/:planId', async (req, res) => {
+    try {
+        const manager = new SubAgentManager();
+        const status = await manager.getPlanStatus(req.params.planId);
+        res.json(status);
+    } catch (error) {
+        console.error('Error getting plan status:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+// Get all plans for a parent task
+app.get('/api/subagents/plans', async (req, res) => {
+    try {
+        const { parentTaskId } = req.query;
+        
+        if (!parentTaskId) {
+            return res.status(400).json({ error: 'parentTaskId query parameter required' });
+        }
+        
+        const manager = new SubAgentManager();
+        const plans = await manager.getPlansForParent(parentTaskId);
+        res.json(plans);
+    } catch (error) {
+        console.error('Error getting plans:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// List active agents
+app.get('/api/subagents/agents', async (req, res) => {
+    try {
+        const manager = new SubAgentManager();
+        const agents = await manager.listActiveAgents();
+        res.json(agents);
+    } catch (error) {
+        console.error('Error listing agents:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cancel an agent
+app.post('/api/subagents/agents/:agentId/cancel', async (req, res) => {
+    try {
+        const manager = new SubAgentManager();
+        const agent = await manager.cancelAgent(req.params.agentId);
+        res.json(agent);
+    } catch (error) {
+        console.error('Error cancelling agent:', error);
+        res.status(404).json({ error: error.message });
+    }
+});
+
+// Report result from subagent (called by subagents)
+app.post('/api/subagents/agents/:agentId/result', async (req, res) => {
+    try {
+        const { result } = req.body;
+        
+        const manager = new SubAgentManager();
+        const data = await manager.reportResult(req.params.agentId, result);
+        
+        res.json(data);
+    } catch (error) {
+        console.error('Error reporting result:', error);
+        res.status(404).json({ error: error.message });
     }
 });
 
