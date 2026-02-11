@@ -1169,19 +1169,31 @@ document.getElementById('importJsonBtn').addEventListener('click', importJSON);
 // === COMMENTS ===
 
 async function loadComments(cardId) {
+    const container = document.getElementById('commentsContainer');
+    if (!container) {
+        console.warn('Comments container not found');
+        return;
+    }
+    
     try {
         const response = await fetch(`/api/cards/${cardId}/comments`, {
             headers: authHeaders()
         });
         
         if (!response.ok) {
-            throw new Error('Failed to load comments');
+            const errorData = await response.json().catch(() => ({}));
+            console.warn('Failed to load comments:', errorData.error || response.statusText);
+            container.innerHTML = '<p class="text-white/50 text-sm italic">Unable to load comments</p>';
+            return;
         }
         
         const comments = await response.json();
         renderComments(comments);
     } catch (error) {
         console.error('Error loading comments:', error);
+        if (container) {
+            container.innerHTML = '<p class="text-white/50 text-sm italic">Error loading comments</p>';
+        }
     }
 }
 
@@ -1722,19 +1734,35 @@ async function executeNextReady() {
 // === SUBTASKS ===
 
 async function loadSubtasks(cardId) {
+    const container = document.getElementById('subtasksContainer');
+    const progressSpan = document.getElementById('subtaskProgress');
+    
+    if (!container) {
+        console.warn('Subtasks container not found');
+        return;
+    }
+    
     try {
         const response = await fetch(`/api/cards/${cardId}/subtasks`, {
             headers: authHeaders()
         });
         
         if (!response.ok) {
-            throw new Error('Failed to load subtasks');
+            const errorData = await response.json().catch(() => ({}));
+            console.warn('Failed to load subtasks:', errorData.error || response.statusText);
+            container.innerHTML = '<p class="text-white/50 text-sm italic">Unable to load subtasks</p>';
+            if (progressSpan) progressSpan.textContent = '';
+            return;
         }
         
         const subtasks = await response.json();
         renderSubtasks(subtasks);
     } catch (error) {
         console.error('Error loading subtasks:', error);
+        if (container) {
+            container.innerHTML = '<p class="text-white/50 text-sm italic">Error loading subtasks</p>';
+        }
+        if (progressSpan) progressSpan.textContent = '';
     }
 }
 
@@ -1742,9 +1770,14 @@ function renderSubtasks(subtasks) {
     const container = document.getElementById('subtasksContainer');
     const progressSpan = document.getElementById('subtaskProgress');
     
-    if (subtasks.length === 0) {
+    if (!container) {
+        console.warn('Subtasks container not found for rendering');
+        return;
+    }
+    
+    if (!subtasks || subtasks.length === 0) {
         container.innerHTML = '<p class="text-white/50 text-sm italic">No subtasks yet</p>';
-        progressSpan.textContent = '';
+        if (progressSpan) progressSpan.textContent = '';
         return;
     }
     
@@ -1752,7 +1785,7 @@ function renderSubtasks(subtasks) {
     const total = subtasks.length;
     const percent = Math.round((completed / total) * 100);
     
-    progressSpan.textContent = `${completed}/${total} (${percent}%)`;
+    if (progressSpan) progressSpan.textContent = `${completed}/${total} (${percent}%)`;
     
     container.innerHTML = subtasks.map(subtask => `
         <div class="flex items-center gap-3 bg-white/10 rounded-lg p-2">
@@ -1958,6 +1991,31 @@ function renderCalendar() {
     grid.innerHTML = html;
 }
 
+function openTaskFromCalendar(taskId) {
+    // Close the calendar day modal first
+    const dayModal = document.getElementById('calendarDayModal');
+    dayModal.classList.add('hidden');
+    dayModal.classList.remove('flex');
+    
+    // Find the task in calendarTasks or currentCards
+    let task = calendarTasks.find(t => t.id === taskId);
+    
+    if (!task && currentCards) {
+        // Search through all columns in currentCards
+        for (const col of Object.values(currentCards)) {
+            task = col.find(c => c.id === taskId);
+            if (task) break;
+        }
+    }
+    
+    if (task) {
+        openEditModal(task);
+    } else {
+        console.error('Task not found:', taskId);
+        alert('Task not found');
+    }
+}
+
 function showDayTasks(dateStr) {
     const modal = document.getElementById('calendarDayModal');
     const title = document.getElementById('calendarDayTitle');
@@ -1974,7 +2032,7 @@ function showDayTasks(dateStr) {
     } else {
         tasksContainer.innerHTML = dayTasks.map(task => `
             <div class="bg-white/10 rounded-xl p-4 cursor-pointer hover:bg-white/20 transition-all" 
-                 onclick="openEditModal('${task.id}', '${task.column}')">
+                 onclick="openTaskFromCalendar('${task.id}')">
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
                         <h4 class="text-white font-semibold ${task.column === 'done' ? 'line-through text-white/50' : ''}">${escapeHtml(task.title)}</h4>
