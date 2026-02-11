@@ -628,6 +628,45 @@ app.get('/api/tracking', (req, res) => {
     }
 });
 
+// Calendar endpoint - get tasks organized by due date
+app.get('/api/calendar', (req, res) => {
+    try {
+        const board = KanbanBoard.getInstance();
+        const columns = board.listCards();
+        
+        // Get all tasks with due dates
+        const allTasks = [];
+        for (const col in columns) {
+            columns[col].forEach(task => {
+                if (task.dueDate) {
+                    allTasks.push(task);
+                }
+            });
+        }
+        
+        // Group by date
+        const tasksByDate = {};
+        allTasks.forEach(task => {
+            if (!tasksByDate[task.dueDate]) {
+                tasksByDate[task.dueDate] = [];
+            }
+            tasksByDate[task.dueDate].push(task);
+        });
+        
+        // Sort dates
+        const sortedDates = Object.keys(tasksByDate).sort();
+        
+        res.json({
+            tasksByDate,
+            sortedDates,
+            total: allTasks.length
+        });
+    } catch (error) {
+        console.error('Error fetching calendar data:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'kanban' });
@@ -777,6 +816,36 @@ app.post('/api/subagents/agents/:agentId/cancel', async (req, res) => {
     }
 });
 
+// Execute next ready subtasks (sequential execution)
+app.post('/api/subagents/plans/:planId/execute-next', async (req, res) => {
+    try {
+        const manager = new SubAgentManager();
+        const spawnedAgents = await manager.executeNextReady(req.params.planId);
+        
+        res.json({
+            success: true,
+            spawned: spawnedAgents.length,
+            agents: spawnedAgents
+        });
+    } catch (error) {
+        console.error('Error executing next subtasks:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get subtasks ready for execution (dependencies satisfied)
+app.get('/api/subagents/plans/:planId/ready', async (req, res) => {
+    try {
+        const manager = new SubAgentManager();
+        const readySubtasks = await manager.getReadySubtasks(req.params.planId);
+        
+        res.json(readySubtasks);
+    } catch (error) {
+        console.error('Error getting ready subtasks:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Report result from subagent (called by subagents)
 app.post('/api/subagents/agents/:agentId/result', async (req, res) => {
     try {
@@ -795,6 +864,42 @@ app.post('/api/subagents/agents/:agentId/result', async (req, res) => {
 // Serve index.html at /kanban
 app.get('/kanban', (req, res) => {
     res.sendFile(path.join(ASSETS_DIR, 'index.html'));
+});
+
+// Serve calendar.html at /kanban/calendar
+app.get('/kanban/calendar', (req, res) => {
+    res.sendFile(path.join(ASSETS_DIR, 'calendar.html'));
+});
+
+// Calendar API - Get tasks by date range
+app.get('/api/calendar/tasks', (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const board = KanbanBoard.getInstance();
+        const allCards = board.listCards();
+        
+        // Flatten all columns
+        let tasks = [];
+        Object.values(allCards).forEach(column => {
+            tasks = tasks.concat(column);
+        });
+        
+        // Filter by date range if provided
+        if (startDate || endDate) {
+            tasks = tasks.filter(task => {
+                if (!task.dueDate) return false;
+                const dueDate = new Date(task.dueDate);
+                if (startDate && dueDate < new Date(startDate)) return false;
+                if (endDate && dueDate > new Date(endDate)) return false;
+                return true;
+            });
+        }
+        
+        res.json(tasks);
+    } catch (error) {
+        console.error('Error fetching calendar tasks:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Error handling

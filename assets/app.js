@@ -1375,6 +1375,26 @@ document.getElementById('trackingCostInput').addEventListener('keypress', (e) =>
 // === SUBAGENTS ===
 
 let currentPlan = null;
+let currentSubagentPlans = null;
+
+async function executeAllSubagents() {
+    if (!currentSubagentPlans || currentSubagentPlans.length === 0) return;
+    
+    try {
+        // Find first plan with pending subtasks
+        const plan = currentSubagentPlans.find(p => p.subtasks.some(st => st.status === 'pending'));
+        if (!plan) {
+            alert('No pending subagents to execute');
+            return;
+        }
+        
+        currentPlan = plan;
+        await executePlan();
+    } catch (error) {
+        console.error('Error executing all subagents:', error);
+        alert('Failed to execute subagents: ' + error.message);
+    }
+}
 
 async function loadSubagents(cardId) {
     try {
@@ -1387,10 +1407,21 @@ async function loadSubagents(cardId) {
         }
 
         const plans = await response.json();
+        currentSubagentPlans = plans; // Store for execute all
         renderSubagents(plans);
+        
+        // Show/hide Execute All button
+        const executeBtn = document.getElementById('executeAllSubagentsBtn');
+        const hasPending = plans.some(p => p.subtasks.some(st => st.status === 'pending'));
+        if (hasPending) {
+            executeBtn.classList.remove('hidden');
+        } else {
+            executeBtn.classList.add('hidden');
+        }
     } catch (error) {
         console.error('Error loading subagents:', error);
         document.getElementById('subagentsContainer').innerHTML = '<p class="text-white/50 text-sm italic">No subagent plans yet</p>';
+        document.getElementById('executeAllSubagentsBtn').classList.add('hidden');
     }
 }
 
@@ -1421,11 +1452,30 @@ function renderSubagents(plans) {
                 </div>
                 <div class="space-y-1 text-sm">
                     ${plan.subtasks.map(st => `
-                        <div class="flex justify-between items-center bg-white/5 rounded p-2">
-                            <span class="text-white/80 ${st.status === 'completed' ? 'line-through' : ''}">${st.index}. ${escapeHtml(st.title)}</span>
+                        <div class="flex justify-between items-center bg-white/5 rounded p-2 ${st.dependsOn && st.dependsOn.length > 0 ? 'border-l-2 border-purple-400' : ''}">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-white/80 ${st.status === 'completed' ? 'line-through' : ''}">${st.index}. ${escapeHtml(st.title)}</span>
+                                    ${st.executionMode === 'sequential' ? '<span class="text-xs text-purple-400" title="Sequential execution">⏳</span>' : ''}
+                                </div>
+                                ${st.dependsOn && st.dependsOn.length > 0 ? `
+                                    <div class="text-xs text-white/50 ml-4">
+                                        ⬆️ Depends on: ${plan.subtasks.filter(d => st.dependsOn.includes(d.id)).map(d => d.title).join(', ')}
+                                    </div>
+                                ` : ''}
+                                ${st.output ? `
+                                    <div class="text-xs text-green-400 ml-4">
+                                        📝 Output available
+                                    </div>
+                                ` : ''}
+                            </div>
                             <div class="flex items-center gap-2">
+                                ${st.status === 'completed' && st.output ? `
+                                    <button onclick="viewSubtaskOutput('${plan.id}', '${st.id}')" class="text-blue-400 hover:text-blue-300 text-xs">📄 Output</button>
+                                ` : ''}
                                 <span class="text-xs ${getStatusColor(st.status)}">${st.status}</span>
-                                ${st.status === 'pending' ? `<button onclick="spawnSubagent('${plan.id}', '${st.id}')" class="text-purple-400 hover:text-purple-300 text-xs">🚀 Spawn</button>` : ''}
+                                ${st.status === 'pending' && (!st.dependsOn || st.dependsOn.length === 0) ? `<button onclick="spawnSubagent('${plan.id}', '${st.id}')" class="text-purple-400 hover:text-purple-300 text-xs">🚀 Spawn</button>` : ''}
+                                ${st.status === 'pending' && st.dependsOn && st.dependsOn.length > 0 ? `<span class="text-xs text-white/40" title="Waiting for dependencies">⏸️ Waiting</span>` : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -1522,11 +1572,36 @@ async function executePlan() {
     if (!currentPlan) return;
 
     try {
-        // Spawn agents for all pending subtasks
-        for (const subtask of currentPlan.subtasks) {
-            if (subtask.status === 'pending') {
-                await spawnSubagent(currentPlan.id, subtask.id);
+        // Check if any subtasks have dependencies (sequential mode)
+        const hasDependencies = currentPlan.subtasks.some(st => 
+            st.dependsOn && st.dependsOn.length > 0
+        );
+        
+        if (hasDependencies) {
+            // Sequential mode: Use execute-next-ready endpoint
+            const response = await fetch(`/api/subagents/plans/${currentPlan.id}/execute-next`, {
+                method: 'POST',
+                headers: authHeaders()
+            });
+            
+            if (!response.ok) throw new Error('Failed to execute next ready subtasks');
+            
+            const result = await response.json();
+            
+            if (result.spawned === 0) {
+                alert('No subtasks ready to execute. Dependencies must be completed first.');
+                return;
             }
+            
+            alert(`Sequential execution started. Spawned ${result.spawned} subtask(s) with satisfied dependencies.\n\nRemaining tasks will execute as dependencies complete.`);
+        } else {
+            // Parallel mode: Spawn all pending subtasks at once
+            for (const subtask of currentPlan.subtasks) {
+                if (subtask.status === 'pending') {
+                    await spawnSubagent(currentPlan.id, subtask.id);
+                }
+            }
+            alert('Parallel execution: All subtasks spawned simultaneously');
         }
 
         closeSubagentPlanModal();
@@ -1572,6 +1647,77 @@ async function spawnSubagent(planId, subtaskId) {
 document.getElementById('planSubagentsBtn').addEventListener('click', planSubagents);
 document.getElementById('executePlanBtn').addEventListener('click', executePlan);
 document.getElementById('cancelPlanBtn').addEventListener('click', closeSubagentPlanModal);
+document.getElementById('executeAllSubagentsBtn').addEventListener('click', executeAllSubagents);
+
+// View subtask output
+async function viewSubtaskOutput(planId, subtaskId) {
+    try {
+        const response = await fetch(`/api/subagents/plans/${planId}`, {
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) throw new Error('Failed to load plan');
+        
+        const plan = await response.json();
+        const subtask = plan.subtasks.find(st => st.id === subtaskId);
+        
+        if (!subtask || !subtask.output) {
+            alert('No output available for this subtask');
+            return;
+        }
+        
+        // Show output in a simple modal/alert
+        const outputWindow = window.open('', '_blank', 'width=800,height=600');
+        outputWindow.document.write(`
+            <html>
+            <head>
+                <title>Output: ${subtask.title}</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: white; }
+                    pre { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; white-space: pre-wrap; }
+                </style>
+            </head>
+            <body>
+                <h2>${subtask.title} - Output</h2>
+                <pre>${subtask.output}</pre>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Error viewing output:', error);
+        alert('Failed to load output');
+    }
+}
+
+// Execute next ready subtasks (sequential mode)
+async function executeNextReady() {
+    if (!currentPlan) return;
+    
+    try {
+        const response = await fetch(`/api/subagents/plans/${currentPlan.id}/execute-next`, {
+            method: 'POST',
+            headers: authHeaders()
+        });
+        
+        if (!response.ok) throw new Error('Failed to execute next subtasks');
+        
+        const result = await response.json();
+        
+        if (result.spawned === 0) {
+            alert('No subtasks ready to execute. Dependencies may not be satisfied yet.');
+        } else {
+            alert(`Spawned ${result.spawned} subtask(s) with satisfied dependencies`);
+            closeSubagentPlanModal();
+            
+            // Reload to show updated status
+            const cardId = document.getElementById('cardIdInput').value;
+            await loadSubagents(cardId);
+        }
+    } catch (error) {
+        console.error('Error executing next subtasks:', error);
+        alert('Failed to execute: ' + error.message);
+    }
+}
 
 // === SUBTASKS ===
 
@@ -1700,6 +1846,177 @@ document.getElementById('newSubtaskInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         addSubtask();
     }
+});
+
+// === CALENDAR VIEW ===
+
+let currentCalendarDate = new Date();
+let calendarTasks = [];
+
+// View toggle
+function showKanbanView() {
+    document.getElementById('kanbanBoard').classList.remove('hidden');
+    document.getElementById('calendarView').classList.add('hidden');
+    document.getElementById('kanbanViewBtn').classList.add('active');
+    document.getElementById('calendarViewBtn').classList.remove('active');
+}
+
+function showCalendarView() {
+    document.getElementById('kanbanBoard').classList.add('hidden');
+    document.getElementById('calendarView').classList.remove('hidden');
+    document.getElementById('kanbanViewBtn').classList.remove('active');
+    document.getElementById('calendarViewBtn').classList.add('active');
+    renderCalendar();
+}
+
+document.getElementById('kanbanViewBtn').addEventListener('click', showKanbanView);
+document.getElementById('calendarViewBtn').addEventListener('click', showCalendarView);
+
+// Calendar navigation
+document.getElementById('prevMonthBtn').addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    renderCalendar();
+});
+
+document.getElementById('nextMonthBtn').addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    renderCalendar();
+});
+
+document.getElementById('todayBtn').addEventListener('click', () => {
+    currentCalendarDate = new Date();
+    renderCalendar();
+});
+
+function renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    const monthYear = document.getElementById('calendarMonthYear');
+    
+    // Update header
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+    monthYear.textContent = `${monthNames[currentCalendarDate.getMonth()]} ${currentCalendarDate.getFullYear()}`;
+    
+    // Get all tasks with due dates - flatten columns object into array
+    calendarTasks = [];
+    Object.values(currentCards).forEach(column => {
+        if (Array.isArray(column)) {
+            column.forEach(card => {
+                if (card.dueDate) calendarTasks.push(card);
+            });
+        }
+    });
+    
+    // Calculate calendar days
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+    const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday
+    
+    // Previous month days to show
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    
+    let html = '';
+    
+    // Previous month days
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        const day = prevMonthLastDay - i;
+        html += `<div class="calendar-day other-month"><span class="calendar-day-number">${day}</span></div>`;
+    }
+    
+    // Current month days
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+        const dayTasks = calendarTasks.filter(task => task.dueDate === dateStr);
+        
+        const todayClass = isToday ? 'today' : '';
+        html += `
+            <div class="calendar-day ${todayClass}" onclick="showDayTasks('${dateStr}')">
+                <span class="calendar-day-number">${day}</span>
+                <div class="calendar-task-dots">
+                    ${dayTasks.slice(0, 5).map(task => `
+                        <span class="task-dot ${task.priority}"></span>
+                    `).join('')}
+                    ${dayTasks.length > 5 ? '<span class="text-xs text-white/60">+' + (dayTasks.length - 5) + '</span>' : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Next month days to fill grid
+    const totalCells = startingDayOfWeek + daysInMonth;
+    const remainingCells = 42 - totalCells; // 6 rows × 7 days
+    for (let day = 1; day <= remainingCells; day++) {
+        html += `<div class="calendar-day other-month"><span class="calendar-day-number">${day}</span></div>`;
+    }
+    
+    grid.innerHTML = html;
+}
+
+function showDayTasks(dateStr) {
+    const modal = document.getElementById('calendarDayModal');
+    const title = document.getElementById('calendarDayTitle');
+    const tasksContainer = document.getElementById('calendarDayTasks');
+    
+    const date = new Date(dateStr);
+    const options = { month: 'long', day: 'numeric', year: 'numeric' };
+    title.textContent = `Tasks for ${date.toLocaleDateString('en-US', options)}`;
+    
+    const dayTasks = calendarTasks.filter(task => task.dueDate === dateStr);
+    
+    if (dayTasks.length === 0) {
+        tasksContainer.innerHTML = '<p class="text-white/60 text-center py-8">No tasks due on this date</p>';
+    } else {
+        tasksContainer.innerHTML = dayTasks.map(task => `
+            <div class="bg-white/10 rounded-xl p-4 cursor-pointer hover:bg-white/20 transition-all" 
+                 onclick="openEditModal('${task.id}', '${task.column}')">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <h4 class="text-white font-semibold ${task.column === 'done' ? 'line-through text-white/50' : ''}">${escapeHtml(task.title)}</h4>
+                        <p class="text-white/70 text-sm mt-1">${escapeHtml(task.description || '').substring(0, 100)}${task.description && task.description.length > 100 ? '...' : ''}</p>
+                    </div>
+                    <span class="px-2 py-1 rounded text-xs font-semibold ${getPriorityColor(task.priority)}">${task.priority}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-2 text-xs text-white/60">
+                    <span>${getColumnEmoji(task.column)} ${task.column}</span>
+                    ${task.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function getColumnEmoji(column) {
+    const emojis = {
+        'backlog': '📋',
+        'todo': '📝',
+        'in-progress': '🚧',
+        'done': '✅'
+    };
+    return emojis[column] || '📋';
+}
+
+function getPriorityColor(priority) {
+    const colors = {
+        'high': 'text-red-400 bg-red-500/20',
+        'medium': 'text-yellow-400 bg-yellow-500/20',
+        'low': 'text-green-400 bg-green-500/20'
+    };
+    return colors[priority] || 'text-blue-400 bg-blue-500/20';
+}
+
+document.getElementById('closeCalendarDayModal').addEventListener('click', () => {
+    const modal = document.getElementById('calendarDayModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 });
 
 function escapeHtml(text) {

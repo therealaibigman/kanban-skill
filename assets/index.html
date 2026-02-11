@@ -162,6 +162,102 @@
         .dark-mode .tag {
             background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
         }
+
+        /* Calendar View Styles */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .calendar-day {
+            background: rgba(255, 255, 255, 0.1);
+            min-height: 80px;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .calendar-day:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .calendar-day.other-month {
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .calendar-day.today {
+            background: rgba(102, 126, 234, 0.3);
+            border: 2px solid rgba(102, 126, 234, 0.8);
+        }
+
+        .calendar-day-number {
+            font-weight: 600;
+            margin-bottom: 2px;
+            font-size: 0.85rem;
+        }
+
+        .calendar-task-dots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            margin-top: auto;
+        }
+
+        .task-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .task-dot.high { background: #ef4444; }
+        .task-dot.medium { background: #f59e0b; }
+        .task-dot.low { background: #10b981; }
+
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            padding: 8px 0;
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .calendar-view-btn {
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .calendar-view-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .calendar-view-btn.active {
+            background: rgba(102, 126, 234, 0.6);
+        }
         
         /* Mobile Responsive Styles */
         @media (max-width: 1024px) {
@@ -410,8 +506,16 @@
             </div>
         </div>
 
+        <!-- View Toggle -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex gap-2 bg-white/10 rounded-xl p-1">
+                <button id="kanbanViewBtn" class="calendar-view-btn active">📊 Kanban</button>
+                <button id="calendarViewBtn" class="calendar-view-btn">📅 Calendar</button>
+            </div>
+        </div>
+
         <!-- Kanban Board -->
-        <div class="grid grid-cols-4 gap-4">
+        <div id="kanbanBoard" class="grid grid-cols-4 gap-4">
             <!-- Backlog Column -->
             <div class="column-container glass rounded-2xl p-4 card-shadow">
                 <h2 class="text-xl font-bold text-white mb-4 pb-3 border-b border-white/20">📋 Backlog</h2>
@@ -434,6 +538,48 @@
             <div class="column-container glass rounded-2xl p-4 card-shadow">
                 <h2 class="text-xl font-bold text-white mb-4 pb-3 border-b border-white/20">✅ Done</h2>
                 <div class="card-container space-y-3" data-column="done"></div>
+            </div>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="calendarView" class="hidden">
+            <div class="glass rounded-2xl p-6 card-shadow">
+                <!-- Calendar Navigation -->
+                <div class="calendar-nav mb-4">
+                    <button id="prevMonthBtn" class="text-white hover:text-white/80 transition-all text-xl">←</button>
+                    <h2 id="calendarMonthYear" class="text-2xl font-bold text-white">February 2026</h2>
+                    <button id="nextMonthBtn" class="text-white hover:text-white/80 transition-all text-xl">→</button>
+                    <button id="todayBtn" class="bg-white/20 text-white py-2 px-4 rounded-lg font-semibold hover:bg-white/30 transition-all ml-4">Today</button>
+                </div>
+
+                <!-- Calendar Header -->
+                <div class="calendar-header">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div id="calendarGrid" class="calendar-grid">
+                    <!-- Days will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Day Modal -->
+    <div id="calendarDayModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="glass rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto card-shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="calendarDayTitle" class="text-2xl font-bold text-white">Tasks for Feb 11</h3>
+                <button id="closeCalendarDayModal" class="text-white/60 hover:text-white text-2xl">×</button>
+            </div>
+            <div id="calendarDayTasks" class="space-y-3">
+                <!-- Tasks for selected day -->
             </div>
         </div>
     </div>
@@ -592,9 +738,14 @@
             <div class="mt-6 border-t border-white/20 pt-6">
                 <div class="flex justify-between items-center mb-3">
                     <h4 class="text-white/90 text-lg font-semibold">🤖 SubAgents</h4>
-                    <button id="planSubagentsBtn" class="bg-purple-500 text-white py-1 px-3 rounded-lg font-semibold hover:bg-purple-600 transition-all text-sm">
-                        📋 Plan Task
-                    </button>
+                    <div class="flex gap-2">
+                        <button id="executeAllSubagentsBtn" class="hidden bg-green-500 text-white py-1 px-3 rounded-lg font-semibold hover:bg-green-600 transition-all text-sm">
+                            🚀 Execute All
+                        </button>
+                        <button id="planSubagentsBtn" class="bg-purple-500 text-white py-1 px-3 rounded-lg font-semibold hover:bg-purple-600 transition-all text-sm">
+                            📋 Plan Task
+                        </button>
+                    </div>
                 </div>
                 <div id="subagentsContainer" class="space-y-3">
                     <!-- Subagent plans will be populated here -->
