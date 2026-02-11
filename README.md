@@ -32,9 +32,12 @@ A production-ready kanban board skill for OpenClaw featuring a modern glassmorph
 - 🎯 **Modern Dashboard UI** - Beautiful glassmorphism design with gradient themes
 - 🔐 **Password Login** - Easy authentication with password → token exchange
 - 🎨 **Visual Kanban Board** - Drag-and-drop with smooth animations
+- 📅 **Calendar View** - Month view with color-coded task dots by due date
 - 📋 **Card Reordering** - Drag cards up/down within columns to prioritize
 - 📊 **Live Stats** - Real-time task counts for each column
 - ⚡ **Auto-Execution** - Tasks moved to "In Progress" trigger instant OpenClaw execution
+- 🤖 **SubAgent Orchestration** - Delegate tasks to AI subagents with sequential workflows
+- 💬 **Task Comments** - Add notes and updates without editing description
 - 📦 **Archive System** - Archive completed tasks, restore if needed, permanent delete
 - 🔒 **Secure Authentication** - Token-based auth integrated with OpenClaw gateway
 
@@ -46,6 +49,8 @@ A production-ready kanban board skill for OpenClaw featuring a modern glassmorph
   - **Cron** ⏰ - Scheduled with cron expression (creates OpenClaw cron job)
 - 🚀 **Four Columns** - Backlog, To Do, In Progress, Done
 - 💬 **Conversational Interface** - Manage tasks through natural language with The Big Man
+- 🗨️ **Task Comments** - Add progress updates and notes to any task
+- 🎨 **Subtasks** - Break tasks into checkboxes with progress tracking
 
 ### Technical Features
 - 🔧 **Systemd Service** - Production-ready deployment with auto-restart
@@ -472,6 +477,138 @@ Keep your Done column tidy by archiving completed tasks while preserving history
 
 ---
 
+## Calendar View
+
+### Overview
+
+Visualize tasks organized by due date in a monthly calendar view.
+
+### Features
+
+- **Month View** - 7×6 grid showing 42 days (previous/current/next month)
+- **Color-Coded Dots** - Priority indicators on each day:
+  - 🔴 Red = High priority tasks
+  - 🟠 Orange = Medium priority
+  - 🟢 Green = Low priority
+- **View Toggle** - Switch between Kanban board and Calendar view
+- **Month Navigation** - ← → buttons to navigate months + "Today" button
+- **Day Detail** - Click any day to see tasks due that date
+- **Today Highlight** - Current day visually distinguished
+- **Cross-Month Visibility** - Previous/next month days shown faded
+
+### Using Calendar View
+
+**Toggle Views:**
+- Click "📅 Calendar" button to switch to calendar view
+- Click "📋 Kanban" button to return to board view
+
+**Navigate Months:**
+- Use ← → arrow buttons to go to previous/next month
+- Click "Today" to return to current month
+
+**View Task Details:**
+- Click any day with dots to see tasks due that date
+- Modal shows task titles, priorities, and columns
+- Click task title to open full task modal
+
+**Add Due Dates:**
+- Edit any task and set "Due Date" field
+- Task appears on calendar on that date
+- Color dot shows task priority
+
+---
+
+## SubAgent Orchestration
+
+### Overview
+
+Delegate complex tasks to AI subagents that work in parallel or sequential workflows. The kanban board now includes a complete subagent management system.
+
+### Features
+
+**Task Planning:**
+- Automatically break tasks into sub-tasks
+- Context-aware workflow pattern detection (7 types)
+- Sequential dependency chains (e.g., Analyze → Design → Implement → Test)
+
+**Execution Modes:**
+- **Parallel** - All subagents run simultaneously (default)
+- **Sequential** - Subagents wait for dependencies to complete
+
+**Context-Aware Workflows:**
+The system analyzes task context to determine appropriate workflow:
+
+| Pattern | Detected By | Workflow Sequence |
+|---------|-------------|-------------------|
+| **Development** | implement, build, feature, create | Analyze → Design → Implement → Test |
+| **Research** | research, investigate, explore | Research → Analyze → Summarize → Report |
+| **Bugfix** | fix, bug, error, issue | Reproduce → Diagnose → Fix → Verify |
+| **Documentation** | document, guide, manual | Outline → Draft → Review → Publish |
+| **Data Analysis** | data, metrics, analytics | Collect → Process → Analyze → Visualize |
+| **Optimization** | optimize, improve, performance | Measure → Analyze → Optimize → Validate |
+| **Integration** | integrate, connect, sync | Plan → Connect → Configure → Validate |
+
+### Using SubAgents
+
+**Plan a Task:**
+1. Open task modal (click any card)
+2. Click "📋 Plan Task" button
+3. System analyzes task and generates sub-tasks
+4. Review generated sub-tasks with dependency chains
+
+**Execute SubAgents:**
+1. After planning, click "🚀 Execute Plan"
+2. Subagents spawn in order based on dependencies
+3. Monitor progress in real-time:
+   - ⏸️ Pending - Waiting for dependencies
+   - ⏳ Executing - Currently running
+   - ✅ Completed - Done with results
+   - ⬆️ Depends on: [Task] - Sequential dependency
+
+**View Progress:**
+- Progress bar shows completion percentage
+- Each subtask shows status and result summary
+- Kanban card automatically syncs with subagent status
+- Comments added with progress updates
+
+**Sequential Handoffs:**
+- When a subagent completes, its output is passed to the next
+- Next agent receives previous results as context
+- Ensures coherent workflow (e.g., Design gets Analysis output)
+
+**Kanban Integration:**
+- Task auto-moves to In Progress when subagents start
+- Progress comments auto-added to card
+- Task moves to Done when all subagents complete
+- Tracking shows tokens/cost per subagent execution
+
+### SubAgent Status Indicators
+
+| Icon | Status | Meaning |
+|------|--------|---------|
+| ⏸️ | Pending | Waiting to start or blocked by dependencies |
+| ⏳ | Executing | Currently running |
+| ✅ | Completed | Finished successfully |
+| ❌ | Failed | Encountered an error |
+| ⬆️ | Depends on | Must wait for another task to complete |
+
+### Technical Details
+
+**Storage:**
+- Plans: `~/.openclaw/workspace/subagents/tasks.json`
+- Agents: `~/.openclaw/workspace/subagents/agents.json`
+- Queue: `~/.openclaw/workspace/subagents/spawn-queue.json`
+
+**API Endpoints:**
+- `POST /api/subagents/plan` - Create plan for task
+- `GET /api/subagents/plans?parentTaskId=` - Get plans for task
+- `GET /api/subagents/plans/:planId` - Get plan details
+- `POST /api/subagents/spawn` - Spawn subagent for subtask
+- `POST /api/subagents/plans/:planId/execute-next` - Trigger sequential execution
+- `POST /api/subagents/agents/:id/result` - Report subagent completion
+
+---
+
 ## API Reference
 
 All endpoints require authentication except where noted.
@@ -616,6 +753,99 @@ Usually empty - tasks execute instantly.
 
 #### DELETE `/api/executions/queue`
 **Purpose:** Clear task queue after processing
+
+### Calendar
+
+#### GET `/api/calendar/tasks`
+**Purpose:** Get tasks organized by due date for calendar view
+
+**Query params:**
+- `year` - Year (default: current)
+- `month` - Month 0-11 (default: current)
+
+**Response:**
+```json
+{
+  "year": 2026,
+  "month": 1,
+  "days": {
+    "1": [{"id": "...", "title": "Task", "priority": "high", ...}],
+    "15": [{"id": "...", "title": "Another task", "priority": "medium", ...}]
+  }
+}
+```
+
+### SubAgents
+
+#### POST `/api/subagents/plan`
+**Purpose:** Create a plan with sub-tasks for a task
+
+**Request:**
+```json
+{
+  "parentTaskId": "task-uuid",
+  "title": "Task Title",
+  "description": "Task description"
+}
+```
+
+**Response:** Plan object with generated sub-tasks
+
+#### GET `/api/subagents/plans`
+**Purpose:** List plans for a parent task
+
+**Query params:**
+- `parentTaskId` - Task ID (required)
+
+**Response:** Array of plans
+
+#### GET `/api/subagents/plans/:planId`
+**Purpose:** Get detailed plan with sub-tasks and agents
+
+#### POST `/api/subagents/plans/:planId/execute-next`
+**Purpose:** Trigger next ready sub-tasks in sequential workflow
+
+#### POST `/api/subagents/spawn`
+**Purpose:** Spawn a subagent for a sub-task
+
+**Request:**
+```json
+{
+  "planId": "plan-uuid",
+  "subtaskId": "subtask-uuid"
+}
+```
+
+#### GET `/api/subagents/agents`
+**Purpose:** List all active subagents
+
+#### POST `/api/subagents/agents/:id/cancel`
+**Purpose:** Cancel a running subagent
+
+#### POST `/api/subagents/agents/:id/result`
+**Purpose:** Report subagent completion result
+
+**Request:**
+```json
+{
+  "result": "Task completed successfully"
+}
+```
+
+### Task Comments
+
+#### POST `/api/cards/:id/comments`
+**Purpose:** Add a comment to a task
+
+**Request:**
+```json
+{
+  "text": "Progress update..."
+}
+```
+
+#### DELETE `/api/cards/:id/comments/:commentId`
+**Purpose:** Delete a comment
 
 ### Health Check
 
