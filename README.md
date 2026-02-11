@@ -1345,3 +1345,27 @@ MIT
 ---
 
 **The Big Man says:** Keep it simple. Keep it sorted. Keep it secure. Nae pish. 💪🏴
+
+---
+
+## Recent Updates
+
+### Feb 11, 2026
+- **Calendar View Task Modal Fix** - Fixed error when opening tasks from calendar day view
+- **Error Handling Improvements** - Better null checks and graceful error messages for comments and subtasks
+
+### Feb 11, 2026
+- **Calendar View** - Added month view with color-coded task dots by due date
+- **SubAgent Orchestration** - Sequential workflows with context-aware pattern detection
+- **Task Comments** - Add progress updates and notes to any task
+- **API Documentation** - Added calendar, subagent, and comments endpoints
+
+### Feb 10, 2026
+- **Mobile-Friendly UI** - Responsive design with touch support
+- **Task Tracking** - Track tokens and cost per task execution
+- **SubAgent Support** - Parallel subagent execution for task planning
+
+### Feb 9, 2026
+- **Dark Mode** - Toggle between light and dark themes
+- **Subtasks** - Break tasks into checkboxes with progress tracking
+- **Export/Import** - JSON and CSV backup support
