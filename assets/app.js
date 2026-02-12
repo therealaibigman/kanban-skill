@@ -2,7 +2,20 @@
 
 let draggedCard = null;
 let currentCards = {}; // Track current card state for comparison
+let filteredCards = {}; // Filtered cards for display
 let authToken = null;
+
+// === FILTER STATE ===
+let filterState = {
+    searchTerm: '',
+    priority: '',
+    column: '',
+    schedule: '',
+    dueDate: '',
+    subtasks: '',
+    tags: [] // Array of selected tag strings
+};
+let searchDebounceTimer = null;
 
 // === AUTH & LOGIN ===
 
@@ -637,7 +650,11 @@ async function fetchCards() {
         if (cardsHaveChanged(newColumns)) {
             debugLog('Cards have changed, re-rendering');
             currentCards = newColumns;
-            renderColumns(newColumns);
+            // Apply filters to new data
+            filteredCards = filterCards();
+            renderColumns(filteredCards);
+            updateResultsCount();
+            populateTagFilters();
         } else {
             debugLog('No changes detected, skipping render');
         }
@@ -807,6 +824,7 @@ document.getElementById('cancelCardBtn').addEventListener('click', closeModal);
 // Initialize
 if (checkAuth()) {
     setupColumnDropZones(); // Set up drag-drop handlers
+    initFilters(); // Initialize filter functionality
     fetchCards();
     setInterval(fetchCards, 5000);
 }
@@ -1930,9 +1948,10 @@ function renderCalendar() {
         'July', 'August', 'September', 'October', 'November', 'December'];
     monthYear.textContent = `${monthNames[currentCalendarDate.getMonth()]} ${currentCalendarDate.getFullYear()}`;
     
-    // Get all tasks with due dates - flatten columns object into array
+    // Get all tasks with due dates - use filteredCards if filters are active
     calendarTasks = [];
-    Object.values(currentCards).forEach(column => {
+    const cardsToUse = hasActiveFilters() ? filteredCards : currentCards;
+    Object.values(cardsToUse).forEach(column => {
         if (Array.isArray(column)) {
             column.forEach(card => {
                 if (card.dueDate) calendarTasks.push(card);
@@ -2081,4 +2100,407 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// === FILTER FUNCTIONS ===
+
+function initFilters() {
+    // Filter toggle button
+    const filterToggleBtn = document.getElementById('filterToggleBtn');
+    const filterBar = document.getElementById('filterBar');
+    
+    if (filterToggleBtn && filterBar) {
+        filterToggleBtn.addEventListener('click', () => {
+            filterBar.classList.toggle('hidden');
+            if (!filterBar.classList.contains('hidden')) {
+                populateTagFilters();
+            }
+        });
+    }
+    
+    // Search input with debounce
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                filterState.searchTerm = e.target.value.toLowerCase();
+                applyFilters();
+            }, 300);
+        });
+    }
+    
+    // Clear filters button
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearAllFilters);
+    }
+    
+    // Clear filters from empty state
+    const clearFiltersEmptyBtn = document.getElementById('clearFiltersEmptyBtn');
+    if (clearFiltersEmptyBtn) {
+        clearFiltersEmptyBtn.addEventListener('click', clearAllFilters);
+    }
+    
+    // Filter dropdowns
+    const priorityFilter = document.getElementById('priorityFilter');
+    if (priorityFilter) {
+        priorityFilter.addEventListener('change', (e) => {
+            filterState.priority = e.target.value;
+            applyFilters();
+        });
+    }
+    
+    const columnFilter = document.getElementById('columnFilter');
+    if (columnFilter) {
+        columnFilter.addEventListener('change', (e) => {
+            filterState.column = e.target.value;
+            applyFilters();
+        });
+    }
+    
+    const scheduleFilter = document.getElementById('scheduleFilter');
+    if (scheduleFilter) {
+        scheduleFilter.addEventListener('change', (e) => {
+            filterState.schedule = e.target.value;
+            applyFilters();
+        });
+    }
+    
+    const dueDateFilter = document.getElementById('dueDateFilter');
+    if (dueDateFilter) {
+        dueDateFilter.addEventListener('change', (e) => {
+            filterState.dueDate = e.target.value;
+            applyFilters();
+        });
+    }
+    
+    const subtasksFilter = document.getElementById('subtasksFilter');
+    if (subtasksFilter) {
+        subtasksFilter.addEventListener('change', (e) => {
+            filterState.subtasks = e.target.value;
+            applyFilters();
+        });
+    }
+}
+
+function populateTagFilters() {
+    const container = document.getElementById('availableTags');
+    if (!container) return;
+    
+    // Collect all unique tags from all cards
+    const allTags = new Set();
+    Object.values(currentCards).forEach(column => {
+        if (Array.isArray(column)) {
+            column.forEach(card => {
+                if (card.tags && Array.isArray(card.tags)) {
+                    card.tags.forEach(tag => allTags.add(tag));
+                }
+            });
+        }
+    });
+    
+    if (allTags.size === 0) {
+        container.innerHTML = '<span class="text-white/40 text-sm italic">No tags available</span>';
+        return;
+    }
+    
+    // Sort tags alphabetically
+    const sortedTags = Array.from(allTags).sort();
+    
+    container.innerHTML = sortedTags.map(tag => {
+        const isSelected = filterState.tags.includes(tag);
+        return `
+            <button 
+                class="tag-filter-btn ${isSelected ? 'selected' : ''} px-3 py-1 rounded-full text-sm font-semibold transition-all ${isSelected ? 'bg-purple-500 text-white' : 'bg-white/20 text-white/70 hover:bg-white/30'}"
+                data-tag="${escapeHtml(tag)}"
+                onclick="toggleTagFilter('${escapeHtml(tag).replace(/'/g, "\\'")}')"
+            >
+                ${isSelected ? '✓ ' : ''}${escapeHtml(tag)}
+            </button>
+        `;
+    }).join('');
+}
+
+function toggleTagFilter(tag) {
+    const index = filterState.tags.indexOf(tag);
+    if (index > -1) {
+        filterState.tags.splice(index, 1);
+    } else {
+        filterState.tags.push(tag);
+    }
+    applyFilters();
+    populateTagFilters(); // Re-render tag buttons with updated state
+}
+
+function filterCards() {
+    const filtered = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    Object.entries(currentCards).forEach(([columnName, cards]) => {
+        if (!Array.isArray(cards)) return;
+        
+        filtered[columnName] = cards.filter(card => {
+            // Text search (title, description)
+            if (filterState.searchTerm) {
+                const searchText = filterState.searchTerm.toLowerCase();
+                const titleMatch = (card.title || '').toLowerCase().includes(searchText);
+                const descMatch = (card.description || '').toLowerCase().includes(searchText);
+                if (!titleMatch && !descMatch) return false;
+            }
+            
+            // Priority filter
+            if (filterState.priority && card.priority !== filterState.priority) {
+                return false;
+            }
+            
+            // Column filter
+            if (filterState.column && card.column !== filterState.column) {
+                return false;
+            }
+            
+            // Schedule filter
+            if (filterState.schedule && card.schedule !== filterState.schedule) {
+                return false;
+            }
+            
+            // Due date filter
+            if (filterState.dueDate && card.dueDate) {
+                const dueDate = new Date(card.dueDate);
+                dueDate.setHours(0, 0, 0, 0);
+                
+                switch (filterState.dueDate) {
+                    case 'overdue':
+                        if (dueDate >= today) return false;
+                        break;
+                    case 'today':
+                        if (dueDate.getTime() !== today.getTime()) return false;
+                        break;
+                    case 'this-week':
+                        if (dueDate < startOfWeek || dueDate > endOfWeek) return false;
+                        break;
+                    case 'this-month':
+                        if (dueDate < startOfMonth || dueDate > endOfMonth) return false;
+                        break;
+                }
+            } else if (filterState.dueDate && !card.dueDate) {
+                return false;
+            }
+            
+            // Subtasks filter
+            if (filterState.subtasks) {
+                const hasSubtasks = card.subtasks && card.subtasks.length > 0;
+                const completedSubtasks = hasSubtasks ? card.subtasks.filter(s => s.completed).length : 0;
+                
+                switch (filterState.subtasks) {
+                    case 'has-subtasks':
+                        if (!hasSubtasks) return false;
+                        break;
+                    case 'all-complete':
+                        if (!hasSubtasks || completedSubtasks !== card.subtasks.length) return false;
+                        break;
+                    case 'none-complete':
+                        if (!hasSubtasks || completedSubtasks > 0) return false;
+                        break;
+                }
+            }
+            
+            // Tags filter (AND logic - card must have ALL selected tags)
+            if (filterState.tags.length > 0) {
+                const cardTags = card.tags || [];
+                const hasAllSelectedTags = filterState.tags.every(tag => cardTags.includes(tag));
+                if (!hasAllSelectedTags) return false;
+            }
+            
+            return true;
+        });
+    });
+    
+    return filtered;
+}
+
+function applyFilters() {
+    filteredCards = filterCards();
+    renderColumns(filteredCards);
+    updateResultsCount();
+    renderActiveFilterPills();
+    updateEmptyState();
+}
+
+function clearAllFilters() {
+    // Reset state
+    filterState = {
+        searchTerm: '',
+        priority: '',
+        column: '',
+        schedule: '',
+        dueDate: '',
+        subtasks: '',
+        tags: []
+    };
+    
+    // Reset UI controls
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
+    
+    const priorityFilter = document.getElementById('priorityFilter');
+    if (priorityFilter) priorityFilter.value = '';
+    
+    const columnFilter = document.getElementById('columnFilter');
+    if (columnFilter) columnFilter.value = '';
+    
+    const scheduleFilter = document.getElementById('scheduleFilter');
+    if (scheduleFilter) scheduleFilter.value = '';
+    
+    const dueDateFilter = document.getElementById('dueDateFilter');
+    if (dueDateFilter) dueDateFilter.value = '';
+    
+    const subtasksFilter = document.getElementById('subtasksFilter');
+    if (subtasksFilter) subtasksFilter.value = '';
+    
+    // Apply and update UI
+    applyFilters();
+    populateTagFilters();
+}
+
+function updateResultsCount() {
+    const totalElement = document.getElementById('totalCardCount');
+    const resultsCount = document.getElementById('resultsCount');
+    
+    if (!totalElement || !resultsCount) return;
+    
+    const totalVisible = Object.values(filteredCards).reduce((sum, cards) => sum + cards.length, 0);
+    const totalAll = Object.values(currentCards).reduce((sum, cards) => sum + (Array.isArray(cards) ? cards.length : 0), 0);
+    
+    totalElement.textContent = totalVisible;
+    
+    if (hasActiveFilters()) {
+        resultsCount.innerHTML = `Showing <span class="font-bold text-white">${totalVisible}</span> of <span class="font-bold text-white">${totalAll}</span> tasks`;
+    } else {
+        resultsCount.innerHTML = `Showing all <span class="font-bold text-white">${totalAll}</span> tasks`;
+    }
+}
+
+function hasActiveFilters() {
+    return filterState.searchTerm || 
+           filterState.priority || 
+           filterState.column || 
+           filterState.schedule || 
+           filterState.dueDate || 
+           filterState.subtasks || 
+           filterState.tags.length > 0;
+}
+
+function renderActiveFilterPills() {
+    const container = document.getElementById('activeFilters');
+    if (!container) return;
+    
+    const pills = [];
+    
+    if (filterState.searchTerm) {
+        pills.push({ type: 'search', label: `🔍 "${filterState.searchTerm}"` });
+    }
+    
+    if (filterState.priority) {
+        pills.push({ type: 'priority', label: `⚡ ${filterState.priority}` });
+    }
+    
+    if (filterState.column) {
+        const columnLabels = { 'backlog': '📋', 'todo': '📝', 'in-progress': '🚧', 'done': '✅' };
+        pills.push({ type: 'column', label: `${columnLabels[filterState.column] || ''} ${filterState.column}` });
+    }
+    
+    if (filterState.schedule) {
+        const scheduleLabels = { 'once': '', 'heartbeat': '💓', 'cron': '⏰' };
+        pills.push({ type: 'schedule', label: `${scheduleLabels[filterState.schedule] || ''} ${filterState.schedule}` });
+    }
+    
+    if (filterState.dueDate) {
+        const dateLabels = { 'overdue': '⚠️ Overdue', 'today': '📅 Today', 'this-week': '📆 This Week', 'this-month': '📈 This Month' };
+        pills.push({ type: 'dueDate', label: dateLabels[filterState.dueDate] });
+    }
+    
+    if (filterState.subtasks) {
+        const subtaskLabels = { 'has-subtasks': 'Has Subtasks', 'all-complete': 'All Complete', 'none-complete': 'None Complete' };
+        pills.push({ type: 'subtasks', label: subtaskLabels[filterState.subtasks] });
+    }
+    
+    filterState.tags.forEach(tag => {
+        pills.push({ type: 'tag', label: `🏷️ ${tag}`, value: tag });
+    });
+    
+    container.innerHTML = pills.map(pill => {
+        let removeAction = '';
+        if (pill.type === 'tag') {
+            removeAction = `onclick="toggleTagFilter('${pill.value.replace(/'/g, "\\'")}')"`;
+        } else if (pill.type !== 'search') {
+            removeAction = `onclick="removeFilter('${pill.type}')"`;
+        }
+        return `
+            <span class="inline-flex items-center gap-1 bg-white/20 text-white px-3 py-1 rounded-full text-sm">
+                ${pill.label}
+                ${pill.type !== 'search' ? `<button ${removeAction} class="ml-1 hover:text-red-300">×</button>` : ''}
+            </span>
+        `;
+    }).join('');
+}
+
+function updateEmptyState() {
+    const emptyState = document.getElementById('emptyFilterState');
+    const kanbanColumns = document.getElementById('kanbanBoard');
+    
+    if (!emptyState || !kanbanColumns) return;
+    
+    const totalVisible = Object.values(filteredCards).reduce((sum, cards) => sum + cards.length, 0);
+    
+    if (hasActiveFilters() && totalVisible === 0) {
+        emptyState.classList.remove('hidden');
+        // Hide the column containers but keep structure
+        const columns = kanbanColumns.querySelectorAll('.column-container');
+        columns.forEach(col => col.style.display = 'none');
+    } else {
+        emptyState.classList.add('hidden');
+        const columns = kanbanColumns.querySelectorAll('.column-container');
+        columns.forEach(col => col.style.display = 'flex');
+    }
+}
+
+// Remove pill filter
+function removeFilter(filterType, value) {
+    switch (filterType) {
+        case 'search':
+            filterState.searchTerm = '';
+            document.getElementById('searchInput').value = '';
+            break;
+        case 'priority':
+            filterState.priority = '';
+            document.getElementById('priorityFilter').value = '';
+            break;
+        case 'column':
+            filterState.column = '';
+            document.getElementById('columnFilter').value = '';
+            break;
+        case 'schedule':
+            filterState.schedule = '';
+            document.getElementById('scheduleFilter').value = '';
+            break;
+        case 'dueDate':
+            filterState.dueDate = '';
+            document.getElementById('dueDateFilter').value = '';
+            break;
+        case 'subtasks':
+            filterState.subtasks = '';
+            document.getElementById('subtasksFilter').value = '';
+            break;
+    }
+    applyFilters();
 }

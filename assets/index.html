@@ -487,6 +487,9 @@
                     <button id="themeToggleBtn" class="bg-gray-700 text-white py-2 px-4 rounded-xl font-semibold hover:bg-gray-600 transition-all" title="Toggle Dark Mode">
                         🌙
                     </button>
+                    <button id="filterToggleBtn" class="bg-purple-500/80 text-white py-2 px-4 rounded-xl font-semibold hover:bg-purple-600 transition-all" title="Toggle Filters">
+                        🔍 Filters
+                    </button>
                     <button id="addCardBtn" class="bg-white text-purple-700 py-2 px-6 rounded-xl font-semibold hover:bg-white/90 transition-all transform hover:scale-105">
                         + Add Task
                     </button>
@@ -514,8 +517,102 @@
             </div>
         </div>
 
+        <!-- Filter Bar -->
+        <div id="filterBar" class="glass rounded-2xl p-4 mb-6 card-shadow hidden">
+            <div class="flex flex-wrap gap-3 items-center mb-3">
+                <!-- Search Input -->
+                <div class="flex-1 min-w-[200px]">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-white/60">🔍</span>
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Search tasks..." 
+                            class="w-full pl-10 pr-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                        >
+                    </div>
+                </div>
+                
+                <!-- Priority Filter -->
+                <select id="priorityFilter" class="px-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer">
+                    <option value="" class="text-gray-800">All Priorities</option>
+                    <option value="low" class="text-gray-800">Low Priority</option>
+                    <option value="medium" class="text-gray-800">Medium Priority</option>
+                    <option value="high" class="text-gray-800">High Priority</option>
+                </select>
+                
+                <!-- Column Filter -->
+                <select id="columnFilter" class="px-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer">
+                    <option value="" class="text-gray-800">All Columns</option>
+                    <option value="backlog" class="text-gray-800">📋 Backlog</option>
+                    <option value="todo" class="text-gray-800">📝 To Do</option>
+                    <option value="in-progress" class="text-gray-800">🚧 In Progress</option>
+                    <option value="done" class="text-gray-800">✅ Done</option>
+                </select>
+                
+                <!-- Schedule Filter -->
+                <select id="scheduleFilter" class="px-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer">
+                    <option value="" class="text-gray-800">All Types</option>
+                    <option value="once" class="text-gray-800">One-time</option>
+                    <option value="heartbeat" class="text-gray-800">Recurring (💓)</option>
+                    <option value="cron" class="text-gray-800">Scheduled (⏰)</option>
+                </select>
+                
+                <!-- Due Date Filter -->
+                <select id="dueDateFilter" class="px-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer">
+                    <option value="" class="text-gray-800">Any Due Date</option>
+                    <option value="overdue" class="text-gray-800">⚠️ Overdue</option>
+                    <option value="today" class="text-gray-800">📅 Today</option>
+                    <option value="this-week" class="text-gray-800">📆 This Week</option>
+                    <option value="this-month" class="text-gray-800">📈 This Month</option>
+                </select>
+                
+                <!-- Subtasks Filter -->
+                <select id="subtasksFilter" class="px-4 py-2 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer">
+                    <option value="" class="text-gray-800">Any Subtasks</option>
+                    <option value="has-subtasks" class="text-gray-800">Has Subtasks</option>
+                    <option value="all-complete" class="text-gray-800">All Complete</option>
+                    <option value="none-complete" class="text-gray-800">None Complete</option>
+                </select>
+
+                <!-- Clear Filters Button -->
+                <button id="clearFiltersBtn" class="bg-white/20 text-white py-2 px-4 rounded-xl font-semibold hover:bg-white/30 transition-all flex items-center gap-2">
+                    ❌ Clear Filters
+                </button>
+            </div>
+            
+            <!-- Tags Filter -->
+            <div id="tagsFilterContainer" class="flex flex-wrap gap-2 items-center">
+                <span class="text-white/70 text-sm font-semibold">Tags:</span>
+                <div id="availableTags" class="flex flex-wrap gap-2">
+                    <!-- Tags will be populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Results Count & Active Filters -->
+            <div class="flex justify-between items-center mt-3 pt-3 border-t border-white/10">
+                <div id="resultsCount" class="text-white/70 text-sm">
+                    Showing all <span id="totalCardCount" class="font-bold text-white">0</span> tasks
+                </div>
+                <div id="activeFilters" class="flex flex-wrap gap-2">
+                    <!-- Active filter pills will be shown here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Kanban Board -->
         <div id="kanbanBoard" class="grid grid-cols-4 gap-4">
+            <!-- Empty State -->
+            <div id="emptyFilterState" class="hidden col-span-4 text-center py-16">
+                <div class="glass rounded-2xl p-8 mx-auto max-w-md">
+                    <span class="text-6xl mb-4 block">🔍</span>
+                    <h3 class="text-2xl font-bold text-white mb-2">No tasks found</h3>
+                    <p class="text-white/70 mb-4">No tasks match your current filters.</p>
+                    <button id="clearFiltersEmptyBtn" class="bg-white text-purple-700 py-2 px-6 rounded-xl font-semibold hover:bg-white/90 transition-all">
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
             <!-- Backlog Column -->
             <div class="column-container glass rounded-2xl p-4 card-shadow">
                 <h2 class="text-xl font-bold text-white mb-4 pb-3 border-b border-white/20">📋 Backlog</h2>

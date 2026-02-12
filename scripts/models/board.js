@@ -14,8 +14,43 @@ class KanbanBoard {
             done: []
         };
         this.archive = [];
+        this.lastModified = 0;
+        this.refreshInterval = null;
         this.loadBoard();
         this.loadArchive();
+        this.startAutoRefresh();
+    }
+
+    // Auto-refresh from disk every 2 seconds
+    startAutoRefresh() {
+        if (this.refreshInterval) return;
+        
+        this.refreshInterval = setInterval(() => {
+            this.checkAndReload();
+        }, 2000);
+        
+        console.log('[Kanban] Auto-refresh enabled (checking every 2s)');
+    }
+
+    stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+    }
+
+    checkAndReload() {
+        try {
+            if (!fs.existsSync(this.dataFile)) return;
+            
+            const stats = fs.statSync(this.dataFile);
+            if (stats.mtimeMs > this.lastModified) {
+                console.log('[Kanban] Detected file change, reloading...');
+                this.loadBoard();
+            }
+        } catch (error) {
+            console.error('[Kanban] Error checking for file changes:', error);
+        }
     }
 
     // Singleton pattern
@@ -35,6 +70,9 @@ class KanbanBoard {
             } else {
                 // Read existing board data
                 this.columns = fs.readJsonSync(this.dataFile);
+                // Update last modified timestamp
+                const stats = fs.statSync(this.dataFile);
+                this.lastModified = stats.mtimeMs;
             }
             
             // Load tasks from Heartbeat if no tasks exist
@@ -58,6 +96,9 @@ class KanbanBoard {
         try {
             fs.ensureFileSync(this.dataFile);
             fs.writeJsonSync(this.dataFile, this.columns, { spaces: 2 });
+            // Update last modified timestamp to prevent immediate reload
+            const stats = fs.statSync(this.dataFile);
+            this.lastModified = stats.mtimeMs;
         } catch (error) {
             console.error('Failed to save Kanban board:', error);
         }
