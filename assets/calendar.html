@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Big Man's Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'big-man': {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .card-shadow {
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .calendar-day {
+            min-height: 120px;
+            transition: all 0.3s ease;
+        }
+        
+        .calendar-day:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .calendar-day.today {
+            background: rgba(102, 126, 234, 0.3);
+            border: 2px solid rgba(102, 126, 234, 0.6);
+        }
+        
+        .calendar-day.other-month {
+            opacity: 0.4;
+        }
+        
+        .task-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .task-dot.high { background-color: #ef4444; }
+        .task-dot.medium { background-color: #f59e0b; }
+        .task-dot.low { background-color: #10b981; }
+        
+        .priority-high { border-left: 4px solid #ef4444; }
+        .priority-medium { border-left: 4px solid #f59e0b; }
+        .priority-low { border-left: 4px solid #10b981; }
+        
+        .tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 9999px;
+            padding: 2px 10px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .day-number {
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .day-number.today-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Modal animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .modal-animate {
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        /* Scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Dark Mode Styles */
+        .dark-mode body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        
+        .dark-mode .glass {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .dark-mode .card-shadow {
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .calendar-grid {
+                grid-template-columns: repeat(7, 1fr);
+            }
+            
+            .calendar-day {
+                min-height: 80px;
+                padding: 4px;
+            }
+            
+            .day-number {
+                font-size: 0.75rem;
+                width: 24px;
+                height: 24px;
+            }
+            
+            .task-preview {
+                font-size: 0.625rem;
+                padding: 1px 2px;
+            }
+        }
+    </style>
+</head>
+<body class="font-sans">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="hidden fixed inset-0 flex items-center justify-center p-4">
+        <div class="glass rounded-3xl p-8 max-w-md w-full card-shadow">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-white mb-2">🏴 The Big Man</h1>
+                <p class="text-white/80">Calendar View</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-white/90 text-sm font-semibold mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        id="passwordInput" 
+                        class="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                    >
+                </div>
+                
+                <button 
+                    type="submit" 
+                    class="w-full bg-white text-purple-700 py-3 px-6 rounded-xl font-bold hover:bg-white/90 transition-all transform hover:scale-105"
+                >
+                    Login
+                </button>
+                
+                <div id="loginError" class="hidden bg-red-500/20 border border-red-500/50 text-white px-4 py-3 rounded-xl text-sm"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Calendar View -->
+    <div id="calendarView" class="hidden container mx-auto px-4 py-6">
+        <!-- Header -->
+        <div class="glass rounded-2xl p-6 mb-6 card-shadow">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h1 class="text-4xl font-bold text-white mb-1">📅 The Big Man's Calendar</h1>
+                    <p class="text-white/70">View tasks by due date</p>
+                </div>
+                <div class="flex gap-3 flex-wrap justify-center">
+                    <button id="prevMonthBtn" class="bg-white/20 text-white py-2 px-4 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                        ← Prev
+                    </button>
+                    <h2 id="currentMonthDisplay" class="text-2xl font-bold text-white min-w-[200px] text-center"></h2>
+                    <button id="nextMonthBtn" class="bg-white/20 text-white py-2 px-4 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                        Next →
+                    </button>
+                    <button id="todayBtn" class="bg-purple-500 text-white py-2 px-4 rounded-xl font-semibold hover:bg-purple-600 transition-all">
+                        Today
+                    </button>
+                    <button id="kanbanBtn" class="bg-white text-purple-700 py-2 px-4 rounded-xl font-semibold hover:bg-white/90 transition-all">
+                        📋 Kanban
+                    </button>
+                    <button id="themeToggleBtn" class="bg-gray-700 text-white py-2 px-4 rounded-xl font-semibold hover:bg-gray-600 transition-all" title="Toggle Dark Mode">
+                        🌙
+                    </button>
+                    <button id="logoutBtn" class="bg-red-500/80 text-white py-2 px-4 rounded-xl font-semibold hover:bg-red-600 transition-all">
+                        🔓 Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="glass rounded-xl p-4 card-shadow text-center">
+                <div class="text-3xl font-bold text-white" id="totalTasksCount">0</div>
+                <div class="text-white/70 text-sm">Total Tasks</div>
+            </div>
+            <div class="glass rounded-xl p-4 card-shadow text-center">
+                <div class="text-3xl font-bold text-red-400" id="highPriorityCount">0</div>
+                <div class="text-white/70 text-sm">High Priority</div>
+            </div>
+            <div class="glass rounded-xl p-4 card-shadow text-center">
+                <div class="text-3xl font-bold text-orange-400" id="mediumPriorityCount">0</div>
+                <div class="text-white/70 text-sm">Medium Priority</div>
+            </div>
+            <div class="glass rounded-xl p-4 card-shadow text-center">
+                <div class="text-3xl font-bold text-green-400" id="lowPriorityCount">0</div>
+                <div class="text-white/70 text-sm">Low Priority</div>
+            </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="glass rounded-2xl p-6 card-shadow">
+            <!-- Day Headers -->
+            <div class="grid grid-cols-7 gap-2 mb-4">
+                <div class="text-center text-white/80 font-bold py-2">Sun</div>
+                <div class="text-center text-white/80 font-bold py-2">Mon</div>
+                <div class="text-center text-white/80 font-bold py-2">Tue</div>
+                <div class="text-center text-white/80 font-bold py-2">Wed</div>
+                <div class="text-center text-white/80 font-bold py-2">Thu</div>
+                <div class="text-center text-white/80 font-bold py-2">Fri</div>
+                <div class="text-center text-white/80 font-bold py-2">Sat</div>
+            </div>
+            
+            <!-- Calendar Days -->
+            <div id="calendarGrid" class="calendar-grid grid grid-cols-7 gap-2">
+                <!-- Days will be populated here -->
+            </div>
+        </div>
+
+        <!-- Upcoming Tasks List -->
+        <div class="glass rounded-2xl p-6 mt-6 card-shadow">
+            <h3 class="text-2xl font-bold text-white mb-4">📋 Upcoming Tasks</h3>
+            <div id="upcomingTasksList" class="space-y-3 custom-scrollbar max-h-[400px] overflow-y-auto">
+                <!-- Upcoming tasks will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Tasks Modal -->
+    <div id="dayModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="glass rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto card-shadow modal-animate">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="dayModalTitle" class="text-3xl font-bold text-white"></h3>
+                <button id="closeDayModalBtn" class="text-white/70 hover:text-white text-2xl font-bold">
+                    ✕
+                </button>
+            </div>
+            <div id="dayTasksList" class="space-y-3">
+                <!-- Tasks for the day will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Detail Modal -->
+    <div id="taskModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="glass rounded-3xl p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto card-shadow modal-animate">
+            <div class="flex justify-between items-start mb-4">
+                <h3 id="taskModalTitle" class="text-2xl font-bold text-white"></h3>
+                <button id="closeTaskModalBtn" class="text-white/70 hover:text-white text-2xl font-bold">
+                    ✕
+                </button>
+            </div>
+            <div id="taskModalContent" class="space-y-4">
+                <!-- Task details will be populated here -->
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button id="viewInKanbanBtn" class="flex-1 bg-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:bg-purple-600 transition-all">
+                    View in Kanban
+                </button>
+                <button id="closeTaskDetailBtn" class="bg-white/20 text-white py-3 px-6 rounded-xl font-semibold hover:bg-white/30 transition-all">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/kanban/calendar.js"></script>
+</body>
+</html>

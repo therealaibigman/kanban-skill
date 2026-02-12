@@ -283,6 +283,8 @@ function createCardElement(card) {
     let touchDragging = false;
     let touchClone = null;
     let touchCurrentTarget = null;
+    let touchScrollContainer = null;
+    let touchScrollLeftStart = 0;
 
     cardElement.addEventListener('touchstart', (e) => {
         // Only handle single finger, not scrolling
@@ -293,28 +295,44 @@ function createCardElement(card) {
         touchStartY = touch.clientY;
         touchDragging = false;
         
-        // Long press detection for drag start
+        // Store the scroll container to disable scrolling during drag
+        touchScrollContainer = document.querySelector('#dashboard .grid-cols-4');
+        if (touchScrollContainer) {
+            touchScrollLeftStart = touchScrollContainer.scrollLeft;
+        }
+        
+        // Add pressing feedback immediately
+        cardElement.classList.add('pressing');
+        
+        // Long press detection for drag start (300ms for snappier feel)
         cardElement.touchTimer = setTimeout(() => {
             touchDragging = true;
+            cardElement.classList.remove('pressing');
             draggedCard = card;
             draggedCardElement = cardElement;
             cardElement.classList.add('dragging');
+            
+            // Disable horizontal scrolling while dragging
+            if (touchScrollContainer) {
+                touchScrollContainer.style.overflowX = 'hidden';
+            }
             
             // Create visual clone
             touchClone = cardElement.cloneNode(true);
             touchClone.style.position = 'fixed';
             touchClone.style.width = cardElement.offsetWidth + 'px';
             touchClone.style.opacity = '0.8';
-            touchClone.style.zIndex = '1000';
+            touchClone.style.zIndex = '10000'; // Higher z-index to stay on top
             touchClone.style.pointerEvents = 'none';
             touchClone.style.transform = 'rotate(2deg) scale(1.05)';
+            touchClone.style.boxShadow = '0 20px 50px rgba(0,0,0,0.5)';
             document.body.appendChild(touchClone);
             
             updateTouchClonePosition(touch);
             
             // Vibrate if supported
             if (navigator.vibrate) navigator.vibrate(50);
-        }, 500);
+        }, 300);
     }, { passive: false });
 
     cardElement.addEventListener('touchmove', (e) => {
@@ -324,18 +342,19 @@ function createCardElement(card) {
         const deltaX = Math.abs(touch.clientX - touchStartX);
         const deltaY = Math.abs(touch.clientY - touchStartY);
         
-        // Cancel drag if scrolling
-        if (!touchDragging && (deltaX > 10 || deltaY > 10)) {
+        // Cancel drag if scrolling significantly before timer fires
+        if (!touchDragging && (deltaX > 15 || deltaY > 15)) {
             clearTimeout(cardElement.touchTimer);
             cardElement.touchTimer = null;
+            cardElement.classList.remove('pressing');
             return;
         }
         
         if (touchDragging) {
-            e.preventDefault();
+            e.preventDefault(); // Prevent scrolling while dragging
             updateTouchClonePosition(touch);
             
-            // Find element under touch
+            // Find element under touch (clone must be hidden to detect elements below)
             touchClone.style.display = 'none';
             const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
             touchClone.style.display = 'block';
@@ -374,7 +393,16 @@ function createCardElement(card) {
         clearTimeout(cardElement.touchTimer);
         cardElement.touchTimer = null;
         
-        if (!touchDragging) return;
+        // Re-enable horizontal scrolling
+        if (touchScrollContainer) {
+            touchScrollContainer.style.overflowX = '';
+            touchScrollContainer = null;
+        }
+        
+        if (!touchDragging) {
+            cardElement.classList.remove('pressing');
+            return;
+        }
         
         touchDragging = false;
         cardElement.classList.remove('dragging');
@@ -398,6 +426,8 @@ function createCardElement(card) {
         if (elemBelow && draggedCard) {
             const targetCard = elemBelow.closest('.card');
             const targetColumn = elemBelow.closest('.card-container');
+            const movedCardId = draggedCard.id;
+            const movedCardColumn = draggedCard.column;
             
             if (targetCard && targetCard !== cardElement) {
                 // Drop on another card - determine position
@@ -417,6 +447,38 @@ function createCardElement(card) {
                 await moveCardToColumn(draggedCard, targetColumn.dataset.column);
             }
         }
+        
+        draggedCard = null;
+        draggedCardElement = null;
+        touchCurrentTarget = null;
+    });
+    
+    // Cleanup touch handlers on touchcancel (e.g., if OS interrupts the touch)
+    cardElement.addEventListener('touchcancel', () => {
+        clearTimeout(cardElement.touchTimer);
+        cardElement.touchTimer = null;
+        
+        // Re-enable horizontal scrolling
+        if (touchScrollContainer) {
+            touchScrollContainer.style.overflowX = '';
+            touchScrollContainer = null;
+        }
+        
+        touchDragging = false;
+        cardElement.classList.remove('dragging');
+        cardElement.classList.remove('pressing');
+        
+        if (touchClone) {
+            touchClone.remove();
+            touchClone = null;
+        }
+        
+        document.querySelectorAll('.card').forEach(c => {
+            c.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        document.querySelectorAll('.card-container').forEach(c => {
+            c.style.backgroundColor = '';
+        });
         
         draggedCard = null;
         draggedCardElement = null;
