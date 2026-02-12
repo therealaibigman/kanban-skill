@@ -285,6 +285,7 @@ function createCardElement(card) {
     let touchCurrentTarget = null;
     let touchScrollContainer = null;
     let touchScrollLeftStart = 0;
+    let autoScrollInterval = null;
 
     cardElement.addEventListener('touchstart', (e) => {
         // Only handle single finger, not scrolling
@@ -354,6 +355,33 @@ function createCardElement(card) {
             e.preventDefault(); // Prevent scrolling while dragging
             updateTouchClonePosition(touch);
             
+            // Auto-scroll horizontal container when near edges
+            const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
+            if (scrollContainer) {
+                const containerRect = scrollContainer.getBoundingClientRect();
+                const edgeThreshold = 60; // pixels from edge to trigger scroll
+                const scrollSpeed = 8; // pixels per frame
+                
+                // Clear existing auto-scroll
+                if (autoScrollInterval) {
+                    clearInterval(autoScrollInterval);
+                    autoScrollInterval = null;
+                }
+                
+                // Near right edge - scroll right
+                if (touch.clientX > containerRect.right - edgeThreshold) {
+                    autoScrollInterval = setInterval(() => {
+                        scrollContainer.scrollLeft += scrollSpeed;
+                    }, 16);
+                }
+                // Near left edge - scroll left
+                else if (touch.clientX < containerRect.left + edgeThreshold) {
+                    autoScrollInterval = setInterval(() => {
+                        scrollContainer.scrollLeft -= scrollSpeed;
+                    }, 16);
+                }
+            }
+            
             // Find element under touch (clone must be hidden to detect elements below)
             touchClone.style.display = 'none';
             const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -397,6 +425,12 @@ function createCardElement(card) {
         if (touchScrollContainer) {
             touchScrollContainer.style.overflowX = '';
             touchScrollContainer = null;
+        }
+        
+        // Stop auto-scroll
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
         }
         
         if (!touchDragging) {
@@ -462,6 +496,12 @@ function createCardElement(card) {
         if (touchScrollContainer) {
             touchScrollContainer.style.overflowX = '';
             touchScrollContainer = null;
+        }
+        
+        // Stop auto-scroll
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
         }
         
         touchDragging = false;
