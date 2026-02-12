@@ -103,6 +103,46 @@
             text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
         
+        /* Drag navigation arrows for mobile */
+        .drag-nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 80px;
+            background: rgba(0, 255, 136, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+        
+        .drag-nav-arrow.visible {
+            opacity: 1;
+        }
+        
+        .drag-nav-arrow.left {
+            left: 0;
+            border-radius: 0 12px 12px 0;
+        }
+        
+        .drag-nav-arrow.right {
+            right: 0;
+            border-radius: 12px 0 0 12px;
+        }
+        
+        @media (min-width: 769px) {
+            .drag-nav-arrow {
+                display: none;
+            }
+        }
+        
         /* Empty column drop indicator */
         .card-container:empty::before {
             content: 'Drop here';
@@ -664,6 +704,10 @@
                 </div>
             </div>
         </div>
+
+        <!-- Drag Navigation Arrows (mobile only) -->
+        <div id="dragNavLeft" class="drag-nav-arrow left">←</div>
+        <div id="dragNavRight" class="drag-nav-arrow right">→</div>
 
         <!-- Kanban Board -->
         <div id="kanbanBoard" class="grid grid-cols-4 gap-4">

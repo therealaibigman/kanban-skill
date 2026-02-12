@@ -333,6 +333,9 @@ function createCardElement(card) {
             
             // Vibrate if supported
             if (navigator.vibrate) navigator.vibrate(50);
+            
+            // Show drag navigation arrows based on current column
+            showDragNavArrows(card.column);
         }, 300);
     }, { passive: false });
 
@@ -427,6 +430,9 @@ function createCardElement(card) {
             autoScrollInterval = null;
         }
         
+        // Hide drag navigation arrows
+        hideDragNavArrows();
+        
         if (!touchDragging) {
             cardElement.classList.remove('pressing');
             return;
@@ -485,6 +491,9 @@ function createCardElement(card) {
             autoScrollInterval = null;
         }
         
+        // Hide drag navigation arrows
+        hideDragNavArrows();
+        
         touchDragging = false;
         cardElement.classList.remove('dragging');
         cardElement.classList.remove('pressing');
@@ -514,6 +523,31 @@ function createCardElement(card) {
             touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
             touchClone.style.top = (touch.clientY - touchClone.offsetHeight / 2) + 'px';
         }
+    }
+
+    function showDragNavArrows(currentColumn) {
+        const leftArrow = document.getElementById('dragNavLeft');
+        const rightArrow = document.getElementById('dragNavRight');
+        const columns = ['backlog', 'todo', 'in-progress', 'done'];
+        const currentIndex = columns.indexOf(currentColumn);
+        
+        if (leftArrow && rightArrow) {
+            // Show left arrow if not in leftmost column
+            if (currentIndex > 0) {
+                leftArrow.classList.add('visible');
+            }
+            // Show right arrow if not in rightmost column
+            if (currentIndex < columns.length - 1) {
+                rightArrow.classList.add('visible');
+            }
+        }
+    }
+
+    function hideDragNavArrows() {
+        const leftArrow = document.getElementById('dragNavLeft');
+        const rightArrow = document.getElementById('dragNavRight');
+        if (leftArrow) leftArrow.classList.remove('visible');
+        if (rightArrow) rightArrow.classList.remove('visible');
     }
 
     async function handleReorder(card, targetCard, insertBefore) {
