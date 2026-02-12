@@ -396,7 +396,7 @@ function createCardElement(card) {
                     c.classList.remove('drag-over-top', 'drag-over-bottom');
                 });
                 document.querySelectorAll('.card-container').forEach(c => {
-                    c.style.backgroundColor = '';
+                    c.classList.remove('drag-active');
                 });
                 
                 if (targetCard && targetCard !== cardElement) {
@@ -410,7 +410,7 @@ function createCardElement(card) {
                     }
                     touchCurrentTarget = targetCard;
                 } else if (targetColumn) {
-                    targetColumn.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                    targetColumn.classList.add('drag-active');
                     touchCurrentTarget = targetColumn;
                 }
             }
@@ -451,7 +451,7 @@ function createCardElement(card) {
             c.classList.remove('drag-over-top', 'drag-over-bottom');
         });
         document.querySelectorAll('.card-container').forEach(c => {
-            c.style.backgroundColor = '';
+            c.classList.remove('drag-active');
         });
         
         const touch = e.changedTouches[0];
@@ -517,9 +517,9 @@ function createCardElement(card) {
             c.classList.remove('drag-over-top', 'drag-over-bottom');
         });
         document.querySelectorAll('.card-container').forEach(c => {
-            c.style.backgroundColor = '';
+            c.classList.remove('drag-active');
         });
-        
+
         draggedCard = null;
         draggedCardElement = null;
         touchCurrentTarget = null;
@@ -680,16 +680,16 @@ function setupColumnDropZones() {
     document.querySelectorAll('.card-container').forEach(container => {
         container.addEventListener('dragover', (e) => {
             e.preventDefault();
-            container.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            container.classList.add('drag-active');
         });
 
         container.addEventListener('dragleave', () => {
-            container.style.backgroundColor = '';
+            container.classList.remove('drag-active');
         });
 
         container.addEventListener('drop', async (e) => {
             e.preventDefault();
-            container.style.backgroundColor = '';
+            container.classList.remove('drag-active');
             
             debugLog('Drop event on column container', container.dataset.column);
             
