@@ -418,11 +418,16 @@
                 transform: none;
             }
             
-            /* Larger touch targets - allow both directions for drag */
+            /* Larger touch targets - allow vertical scroll, JS handles drag */
             .card {
-                touch-action: none;
+                touch-action: pan-y;
                 user-select: none;
                 -webkit-user-select: none;
+            }
+            
+            /* When dragging, disable all touch actions */
+            .card.dragging {
+                touch-action: none;
             }
             
             /* Visual feedback when card is being pressed (before drag starts) */
