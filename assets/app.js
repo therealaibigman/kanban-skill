@@ -849,6 +849,20 @@ async function saveCard() {
     const cronExpression = document.getElementById('cardCronInput').value;
 
     try {
+        // If editing and column changed, move the card first
+        if (cardId && currentColumn && currentColumn !== targetColumn) {
+            debugLog(`Moving card from ${currentColumn} to ${targetColumn}`);
+            const moveResponse = await fetch(`/api/cards/${cardId}/move`, {
+                method: 'PUT',
+                headers: authHeaders(),
+                body: JSON.stringify({ fromColumn: currentColumn, toColumn: targetColumn })
+            });
+            
+            if (!moveResponse.ok) {
+                throw new Error('Failed to move card to new column');
+            }
+        }
+        
         const url = cardId ? `/api/cards/${cardId}` : '/api/cards';
         const method = cardId ? 'PUT' : 'POST';
         
@@ -858,7 +872,7 @@ async function saveCard() {
             priority, 
             tags,
             dueDate,
-            column: cardId ? currentColumn : targetColumn, // Use targetColumn for new cards
+            column: targetColumn,
             schedule
         };
         
