@@ -355,18 +355,17 @@ function createCardElement(card) {
             e.preventDefault(); // Prevent scrolling while dragging
             updateTouchClonePosition(touch);
             
-            // Auto-scroll horizontal container when near edges
+            // Auto-scroll horizontal container when near viewport edges
             const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
             if (scrollContainer) {
-                const containerRect = scrollContainer.getBoundingClientRect();
-                const edgeThreshold = 100; // pixels from edge to trigger scroll (reduced for easier triggering)
-                const scrollSpeed = 20; // pixels per frame (increased for faster scroll)
+                const edgeThreshold = 80; // pixels from viewport edge to trigger scroll
+                const scrollSpeed = 25; // pixels per frame
                 
-                // Calculate distance from edges
-                const distFromLeft = touch.clientX - containerRect.left;
-                const distFromRight = containerRect.right - touch.clientX;
-                
-                debugLog(`Touch position: ${touch.clientX}, container: ${containerRect.left}-${containerRect.right}, distLeft: ${distFromLeft}, distRight: ${distFromRight}`);
+                // Use viewport coordinates (screen edges), not container coordinates
+                const viewportWidth = window.innerWidth;
+                const touchX = touch.clientX;
+                const distFromViewportLeft = touchX;
+                const distFromViewportRight = viewportWidth - touchX;
                 
                 // Clear existing auto-scroll
                 if (autoScrollInterval) {
@@ -375,17 +374,17 @@ function createCardElement(card) {
                     scrollContainer.classList.remove('auto-scrolling-left', 'auto-scrolling-right');
                 }
                 
-                // Near right edge - scroll right
-                if (distFromRight < edgeThreshold) {
-                    debugLog('Auto-scrolling RIGHT');
+                // Near right edge of screen - scroll right
+                if (distFromViewportRight < edgeThreshold) {
+                    console.log('[Kanban] Auto-scrolling RIGHT');
                     scrollContainer.classList.add('auto-scrolling-right');
                     autoScrollInterval = setInterval(() => {
                         scrollContainer.scrollLeft += scrollSpeed;
                     }, 16);
                 }
-                // Near left edge - scroll left
-                else if (distFromLeft < edgeThreshold) {
-                    debugLog('Auto-scrolling LEFT');
+                // Near left edge of screen - scroll left
+                else if (distFromViewportLeft < edgeThreshold) {
+                    console.log('[Kanban] Auto-scrolling LEFT');
                     scrollContainer.classList.add('auto-scrolling-left');
                     autoScrollInterval = setInterval(() => {
                         scrollContainer.scrollLeft -= scrollSpeed;
