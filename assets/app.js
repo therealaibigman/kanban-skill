@@ -359,23 +359,34 @@ function createCardElement(card) {
             const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
             if (scrollContainer) {
                 const containerRect = scrollContainer.getBoundingClientRect();
-                const edgeThreshold = 180; // pixels from edge to trigger scroll (increased from 120)
-                const scrollSpeed = 15; // pixels per frame (increased from 12)
+                const edgeThreshold = 100; // pixels from edge to trigger scroll (reduced for easier triggering)
+                const scrollSpeed = 20; // pixels per frame (increased for faster scroll)
+                
+                // Calculate distance from edges
+                const distFromLeft = touch.clientX - containerRect.left;
+                const distFromRight = containerRect.right - touch.clientX;
+                
+                debugLog(`Touch position: ${touch.clientX}, container: ${containerRect.left}-${containerRect.right}, distLeft: ${distFromLeft}, distRight: ${distFromRight}`);
                 
                 // Clear existing auto-scroll
                 if (autoScrollInterval) {
                     clearInterval(autoScrollInterval);
                     autoScrollInterval = null;
+                    scrollContainer.classList.remove('auto-scrolling-left', 'auto-scrolling-right');
                 }
                 
                 // Near right edge - scroll right
-                if (touch.clientX > containerRect.right - edgeThreshold) {
+                if (distFromRight < edgeThreshold) {
+                    debugLog('Auto-scrolling RIGHT');
+                    scrollContainer.classList.add('auto-scrolling-right');
                     autoScrollInterval = setInterval(() => {
                         scrollContainer.scrollLeft += scrollSpeed;
                     }, 16);
                 }
                 // Near left edge - scroll left
-                else if (touch.clientX < containerRect.left + edgeThreshold) {
+                else if (distFromLeft < edgeThreshold) {
+                    debugLog('Auto-scrolling LEFT');
+                    scrollContainer.classList.add('auto-scrolling-left');
                     autoScrollInterval = setInterval(() => {
                         scrollContainer.scrollLeft -= scrollSpeed;
                     }, 16);
@@ -425,6 +436,12 @@ function createCardElement(card) {
         if (autoScrollInterval) {
             clearInterval(autoScrollInterval);
             autoScrollInterval = null;
+        }
+        
+        // Clear auto-scroll visual feedback
+        const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
+        if (scrollContainer) {
+            scrollContainer.classList.remove('auto-scrolling-left', 'auto-scrolling-right');
         }
         
         if (!touchDragging) {
@@ -483,6 +500,12 @@ function createCardElement(card) {
         if (autoScrollInterval) {
             clearInterval(autoScrollInterval);
             autoScrollInterval = null;
+        }
+        
+        // Clear auto-scroll visual feedback
+        const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
+        if (scrollContainer) {
+            scrollContainer.classList.remove('auto-scrolling-left', 'auto-scrolling-right');
         }
         
         touchDragging = false;

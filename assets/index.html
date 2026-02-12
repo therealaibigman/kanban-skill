@@ -102,6 +102,15 @@
             color: #00ff88;
             text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
+        
+        /* Auto-scroll visual feedback */
+        #kanbanBoard.auto-scrolling-left {
+            box-shadow: inset 30px 0 50px rgba(0, 255, 136, 0.3);
+        }
+        
+        #kanbanBoard.auto-scrolling-right {
+            box-shadow: inset -30px 0 50px rgba(0, 255, 136, 0.3);
+        }
 
         /* Empty column drop indicator */
         .card-container:empty::before {
