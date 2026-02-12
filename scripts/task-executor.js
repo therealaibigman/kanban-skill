@@ -71,41 +71,31 @@ class TaskExecutor {
     }
 
     async injectToSession(message) {
-        // Use OpenClaw's cron wake mechanism to inject a system event
-        // This triggers The Big Man to handle the task
-        const wakeFile = path.join(this.workspaceDir, '.kanban-wake');
-        await fs.writeFile(wakeFile, JSON.stringify({
+        // Write to kanban task queue - HEARTBEAT.md checks this file
+        const taskQueueFile = path.join(this.workspaceDir, 'kanban-task-queue.json');
+        let queue = [];
+        
+        if (await fs.pathExists(taskQueueFile)) {
+            queue = await fs.readJson(taskQueueFile);
+        }
+        
+        // Add new task to queue
+        queue.push({
             timestamp: Date.now(),
-            message: message,
-            source: 'kanban-auto-execute'
-        }));
+            message: message
+        });
         
-        // Alternative: use openclaw CLI to send to session
-        // But we'll use the simpler file-based approach for now
+        await fs.writeJson(taskQueueFile, queue, { spaces: 2 });
+        console.log(`[TaskExecutor] Task added to queue: ${taskQueueFile}`);
         
-        // Actually, let's use the cron wake API
+        // Try to trigger immediate execution via OpenClaw CLI
         try {
-            const cmd = `curl -s -X POST http://127.0.0.1:18789/rpc \
-                -H "Content-Type: application/json" \
-                -d '{"method":"cron.wake","params":{"text":"${message.replace(/"/g, '\\"').replace(/\n/g, '\\n')}","mode":"now"}}'`;
-            
-            await execPromise(cmd);
+            const cmd = `openclaw cron wake "${message.replace(/"/g, '\\"').substring(0, 100)}..." --mode now 2>&1 || true`;
+            const { stdout } = await execPromise(cmd);
+            console.log(`[TaskExecutor] Wake command result: ${stdout}`);
         } catch (error) {
-            console.error('Failed to wake via API, using fallback');
-            // Fallback: write to a file that The Big Man checks during heartbeat
-            const taskQueueFile = path.join(this.workspaceDir, 'kanban-task-queue.json');
-            let queue = [];
-            
-            if (await fs.pathExists(taskQueueFile)) {
-                queue = await fs.readJson(taskQueueFile);
-            }
-            
-            queue.push({
-                timestamp: Date.now(),
-                message: message
-            });
-            
-            await fs.writeJson(taskQueueFile, queue, { spaces: 2 });
+            // CLI might not be available, queue will be processed on next heartbeat
+            console.log('[TaskExecutor] CLI wake not available, will process via heartbeat');
         }
     }
 
