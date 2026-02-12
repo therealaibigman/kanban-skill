@@ -359,8 +359,8 @@ function createCardElement(card) {
             const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
             if (scrollContainer) {
                 const containerRect = scrollContainer.getBoundingClientRect();
-                const edgeThreshold = 120; // pixels from edge to trigger scroll (increased from 60)
-                const scrollSpeed = 12; // pixels per frame (increased from 8)
+                const edgeThreshold = 180; // pixels from edge to trigger scroll (increased from 120)
+                const scrollSpeed = 15; // pixels per frame (increased from 12)
                 
                 // Clear existing auto-scroll
                 if (autoScrollInterval) {
