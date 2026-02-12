@@ -103,13 +103,29 @@
             text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
         
-        /* Auto-scroll visual feedback */
-        #kanbanBoard.auto-scrolling-left {
-            box-shadow: inset 30px 0 50px rgba(0, 255, 136, 0.3);
+        /* Drag column picker */
+        #dragColumnPicker {
+            animation: slideDown 0.2s ease;
         }
         
-        #kanbanBoard.auto-scrolling-right {
-            box-shadow: inset -30px 0 50px rgba(0, 255, 136, 0.3);
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .drag-col-btn {
+            transition: all 0.2s ease;
+            min-width: 80px;
+        }
+        
+        .drag-col-btn:active {
+            transform: scale(0.95);
+        }
+        
+        @media (min-width: 769px) {
+            #dragColumnPicker {
+                display: none !important;
+            }
         }
 
         /* Empty column drop indicator */
@@ -340,10 +356,10 @@
             }
             
             #dashboard .grid-cols-4 > div {
-                flex: 0 0 85vw;
-                min-width: 280px;
-                max-width: 320px;
-                scroll-snap-align: start;
+                flex: 0 0 75vw;
+                min-width: 260px;
+                max-width: 300px;
+                scroll-snap-align: center;
             }
             
             /* Smaller column containers */
@@ -588,6 +604,17 @@
             <div class="flex gap-2 bg-white/10 rounded-xl p-1">
                 <button id="kanbanViewBtn" class="calendar-view-btn active">📊 Kanban</button>
                 <button id="calendarViewBtn" class="calendar-view-btn">📅 Calendar</button>
+            </div>
+        </div>
+
+        <!-- Mobile Drag Column Picker -->
+        <div id="dragColumnPicker" class="hidden glass rounded-xl p-3 mb-4 card-shadow">
+            <p class="text-white/70 text-sm mb-2 text-center">Move to:</p>
+            <div class="flex gap-2 justify-center">
+                <button class="drag-col-btn bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded-lg text-sm" data-column="backlog">📋 Backlog</button>
+                <button class="drag-col-btn bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded-lg text-sm" data-column="todo">📝 To Do</button>
+                <button class="drag-col-btn bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded-lg text-sm" data-column="in-progress">🚧 In Progress</button>
+                <button class="drag-col-btn bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded-lg text-sm" data-column="done">✅ Done</button>
             </div>
         </div>
 

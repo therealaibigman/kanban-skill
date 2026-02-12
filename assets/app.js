@@ -333,8 +333,82 @@ function createCardElement(card) {
             
             // Vibrate if supported
             if (navigator.vibrate) navigator.vibrate(50);
+            
+            // Show mobile drag column picker
+            showDragColumnPicker(card);
         }, 300);
     }, { passive: false });
+    
+    // Handle column picker button clicks
+    document.querySelectorAll('.drag-col-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!draggedCard) return;
+            
+            const targetColumn = btn.dataset.column;
+            const fromColumn = draggedCard.column;
+            
+            if (targetColumn !== fromColumn) {
+                await moveCardToColumn(draggedCard, targetColumn);
+            }
+            
+            // Reset drag state
+            cleanupDragState(cardElement);
+        });
+    });
+    
+    function showDragColumnPicker(card) {
+        const picker = document.getElementById('dragColumnPicker');
+        if (picker && window.innerWidth < 769) {
+            // Hide the current column button
+            picker.querySelectorAll('.drag-col-btn').forEach(btn => {
+                btn.style.display = btn.dataset.column === card.column ? 'none' : 'block';
+            });
+            picker.classList.remove('hidden');
+        }
+    }
+    
+    function hideDragColumnPicker() {
+        const picker = document.getElementById('dragColumnPicker');
+        if (picker) {
+            picker.classList.add('hidden');
+        }
+    }
+    
+    function cleanupDragState(cardElement) {
+        hideDragColumnPicker();
+        
+        if (touchClone) {
+            touchClone.remove();
+            touchClone = null;
+        }
+        
+        document.querySelectorAll('.card').forEach(c => {
+            c.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        document.querySelectorAll('.card-container').forEach(c => {
+            c.classList.remove('drag-active');
+        });
+        document.querySelectorAll('.column-container').forEach(c => {
+            c.classList.remove('drag-active');
+        });
+        
+        draggedCard = null;
+        draggedCardElement = null;
+        touchCurrentTarget = null;
+        touchDragging = false;
+        cardElement.classList.remove('dragging');
+        
+        if (touchScrollContainer) {
+            touchScrollContainer.style.overflowX = '';
+            touchScrollContainer = null;
+        }
+        
+        if (autoScrollInterval) {
+            clearInterval(autoScrollInterval);
+            autoScrollInterval = null;
+        }
+    }
 
     cardElement.addEventListener('touchmove', (e) => {
         if (!cardElement.touchTimer && !touchDragging) return;
@@ -425,6 +499,9 @@ function createCardElement(card) {
         clearTimeout(cardElement.touchTimer);
         cardElement.touchTimer = null;
         
+        // Hide drag column picker
+        hideDragColumnPicker();
+        
         // Re-enable horizontal scrolling
         if (touchScrollContainer) {
             touchScrollContainer.style.overflowX = '';
@@ -435,12 +512,6 @@ function createCardElement(card) {
         if (autoScrollInterval) {
             clearInterval(autoScrollInterval);
             autoScrollInterval = null;
-        }
-        
-        // Clear auto-scroll visual feedback
-        const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
-        if (scrollContainer) {
-            scrollContainer.classList.remove('auto-scrolling-left', 'auto-scrolling-right');
         }
         
         if (!touchDragging) {
@@ -489,6 +560,9 @@ function createCardElement(card) {
         clearTimeout(cardElement.touchTimer);
         cardElement.touchTimer = null;
         
+        // Hide drag column picker
+        hideDragColumnPicker();
+        
         // Re-enable horizontal scrolling
         if (touchScrollContainer) {
             touchScrollContainer.style.overflowX = '';
@@ -499,12 +573,6 @@ function createCardElement(card) {
         if (autoScrollInterval) {
             clearInterval(autoScrollInterval);
             autoScrollInterval = null;
-        }
-        
-        // Clear auto-scroll visual feedback
-        const scrollContainer = document.querySelector('#dashboard .grid-cols-4');
-        if (scrollContainer) {
-            scrollContainer.classList.remove('auto-scrolling-left', 'auto-scrolling-right');
         }
         
         touchDragging = false;
