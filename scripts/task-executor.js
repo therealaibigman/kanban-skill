@@ -62,6 +62,16 @@ class TaskExecutor {
             message += `**Tags:** ${task.tags.join(', ')}\n`;
         }
         
+        // Add incremental writing directive for large tasks
+        message += `\n`;
+        message += `**⚠️ CRITICAL - WRITE INCREMENTALLY:**\n`;
+        message += `- This is a LARGE task that requires creating documents or extensive output\n`;
+        message += `- **DO NOT** generate all content in your response text\n`;
+        message += `- Use MULTIPLE write() calls with small chunks (500 words max per write)\n`;
+        message += `- Start with an outline, then write sections one at a time\n`;
+        message += `- After first write, use APPEND mode to add more content\n`;
+        message += `- If you hit token limits, the task will FAIL without saving\n`;
+        message += `- Write EARLY and OFTEN - don't wait until the end\n`;
         message += `\n`;
         
         // The actual instruction
