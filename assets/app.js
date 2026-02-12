@@ -175,20 +175,32 @@ function cardsHaveChanged(newColumns) {
 
 function renderColumns(columns) {
     debugLog('Rendering columns:', columns);
+    console.log('[DEBUG] renderColumns called with:', JSON.stringify(Object.keys(columns)));
     const columnNames = ['backlog', 'todo', 'in-progress', 'done'];
     
     columnNames.forEach(columnName => {
-        const columnContainer = document.querySelector(`[data-column="${columnName}"]`);
+        console.log(`[DEBUG] Processing column: ${columnName}`);
+        const columnContainer = document.querySelector(`.card-container[data-column="${columnName}"]`);
         if (!columnContainer) {
-            console.error(`Column container not found for: ${columnName}`);
+            console.error(`[DEBUG] Column container not found for: ${columnName}`);
             return;
         }
         
+        console.log(`[DEBUG] Found container for ${columnName}, clearing...`);
         columnContainer.innerHTML = ''; 
+        
+        const cards = columns[columnName] || [];
+        console.log(`[DEBUG] ${columnName} has ${cards.length} cards`);
 
-        (columns[columnName] || []).forEach(card => {
-            const cardElement = createCardElement(card);
-            columnContainer.appendChild(cardElement);
+        cards.forEach((card, index) => {
+            console.log(`[DEBUG] Creating card ${index}: ${card.title}`);
+            try {
+                const cardElement = createCardElement(card);
+                columnContainer.appendChild(cardElement);
+                console.log(`[DEBUG] Card ${index} appended successfully`);
+            } catch (err) {
+                console.error(`[DEBUG] Error creating card ${index}:`, err);
+            }
         });
     });
 }
