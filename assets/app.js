@@ -399,18 +399,12 @@ function createCardElement(card) {
                     c.classList.remove('drag-active');
                 });
                 
-                if (targetCard && targetCard !== cardElement) {
-                    const rect = targetCard.getBoundingClientRect();
-                    const midpoint = rect.top + rect.height / 2;
-                    
-                    if (touch.clientY < midpoint) {
-                        targetCard.classList.add('drag-over-top');
-                    } else {
-                        targetCard.classList.add('drag-over-bottom');
-                    }
-                    touchCurrentTarget = targetCard;
-                } else if (targetColumn) {
+                // Mobile: just light up the column (both container and parent), drop at end
+                if (targetColumn) {
                     targetColumn.classList.add('drag-active');
+                    // Also light up the parent column-container for full column effect
+                    const parentColumn = targetColumn.closest('.column-container');
+                    if (parentColumn) parentColumn.classList.add('drag-active');
                     touchCurrentTarget = targetColumn;
                 }
             }
@@ -453,31 +447,18 @@ function createCardElement(card) {
         document.querySelectorAll('.card-container').forEach(c => {
             c.classList.remove('drag-active');
         });
+        document.querySelectorAll('.column-container').forEach(c => {
+            c.classList.remove('drag-active');
+        });
         
         const touch = e.changedTouches[0];
         const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
         
         if (elemBelow && draggedCard) {
-            const targetCard = elemBelow.closest('.card');
             const targetColumn = elemBelow.closest('.card-container');
-            const movedCardId = draggedCard.id;
-            const movedCardColumn = draggedCard.column;
             
-            if (targetCard && targetCard !== cardElement) {
-                // Drop on another card - determine position
-                const rect = targetCard.getBoundingClientRect();
-                const midpoint = rect.top + rect.height / 2;
-                const insertBefore = touch.clientY < midpoint;
-                
-                // Same column reorder
-                if (targetCard.dataset.column === card.column) {
-                    await handleReorder(draggedCard, targetCard, insertBefore);
-                } else {
-                    // Different column move
-                    await moveCardToColumn(draggedCard, targetCard.dataset.column);
-                }
-            } else if (targetColumn) {
-                // Drop on empty column area
+            // Mobile: just move to column, drop at the end (ignore card position)
+            if (targetColumn && targetColumn.dataset.column !== draggedCard.column) {
                 await moveCardToColumn(draggedCard, targetColumn.dataset.column);
             }
         }
@@ -517,6 +498,9 @@ function createCardElement(card) {
             c.classList.remove('drag-over-top', 'drag-over-bottom');
         });
         document.querySelectorAll('.card-container').forEach(c => {
+            c.classList.remove('drag-active');
+        });
+        document.querySelectorAll('.column-container').forEach(c => {
             c.classList.remove('drag-active');
         });
 
