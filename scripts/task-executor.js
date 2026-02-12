@@ -62,22 +62,45 @@ class TaskExecutor {
             message += `**Tags:** ${task.tags.join(', ')}\n`;
         }
         
-        // Add incremental writing directive for large tasks
-        message += `\n`;
-        message += `**⚠️ CRITICAL - WRITE INCREMENTALLY:**\n`;
-        message += `- This is a LARGE task that requires creating documents or extensive output\n`;
-        message += `- **DO NOT** generate all content in your response text\n`;
-        message += `- Use MULTIPLE write() calls with small chunks (500 words max per write)\n`;
-        message += `- Start with an outline, then write sections one at a time\n`;
-        message += `- After first write, use APPEND mode to add more content\n`;
-        message += `- If you hit token limits, the task will FAIL without saving\n`;
-        message += `- Write EARLY and OFTEN - don't wait until the end\n`;
-        message += `\n`;
+        // Add incremental writing directive for analysis/research/planning tasks
+        const isLargeOutputTask = this.isLargeOutputTask(task);
+        if (isLargeOutputTask) {
+            message += `\n`;
+            message += `**⚠️ CRITICAL - WRITE INCREMENTALLY:**\n`;
+            message += `- This is a LARGE task that requires creating documents or extensive output\n`;
+            message += `- **DO NOT** generate all content in your response text\n`;
+            message += `- Use MULTIPLE write() calls with small chunks (500 words max per write)\n`;
+            message += `- Start with an outline, then write sections one at a time\n`;
+            message += `- After first write, use APPEND mode to add more content\n`;
+            message += `- If you hit token limits, the task will FAIL without saving\n`;
+            message += `- Write EARLY and OFTEN - don't wait until the end\n`;
+            message += `\n`;
+        }
         
         // The actual instruction
         message += task.title;
         
         return message;
+    }
+    
+    isLargeOutputTask(task) {
+        // Check title for analysis/research/planning keywords
+        const title = (task.title || '').toLowerCase();
+        const description = (task.description || '').toLowerCase();
+        const tags = (task.tags || []).map(t => t.toLowerCase());
+        
+        const largeOutputKeywords = [
+            'analyze', 'analysis', 'research', 'design', 'plan', 'planning',
+            'document', 'documentation', 'report', 'study', 'investigate',
+            'proposal', 'strategy', 'architecture', 'blueprint', 'spec'
+        ];
+        
+        // Check if any keyword appears in title, description, or tags
+        return largeOutputKeywords.some(keyword => 
+            title.includes(keyword) || 
+            description.includes(keyword) ||
+            tags.some(tag => tag.includes(keyword))
+        );
     }
 
     async injectToSession(message) {
